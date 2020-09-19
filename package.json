@@ -1,6 +1,6 @@
 {
   "name": "fullpage-swiper",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Fullpage-swiper is fullpage movement library for browser via touch actions",
   "main": "dist/fullpage-swiper.min.js",
   "scripts": {
