@@ -8,12 +8,11 @@ npm install -S fullpage-swiper
 
 ## Check examples
 ```bash
-npm run example:view
+npm run examples:view
 # go to http://localhost:3000
 ```
 
 ## Getting started
-
 ```html
 <!-- 
   markup required
@@ -59,6 +58,14 @@ new Fullpage('#container', {
     console.log('DRAG_END: callback');
   }
 });
+```
+
+## CDN
+```html
+<script src="https://unpkg.com/fullpage-swiper"><script>
+<script>
+// Use 'Fullpage' global variable.
+<script>
 ```
 
 ## Constraints
