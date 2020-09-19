@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>fullpage-swiper</title>
+  <script src="https://unpkg.com/hammerjs@2.0.8/hammer.min.js"></script>
+  <script src="https://unpkg.com/gsap@3.5.1/dist/gsap.min.js"></script>
+  <style>
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="container" data-stack-type="top">
+    <section data-stack>
+      <div data-stack-type="top">
+        <div data-stack>Top<->Down 1</div>
+        <div data-stack>Top<->Down 2</div>
+        <div data-stack>Top<->Down 3</div>
+      </div>
+    </section>
+    <section data-stack>
+      <div data-stack-type="left">
+        <div data-stack>Left <-> Right 1</div>
+        <div data-stack>Left <-> Right 2</div>
+        <div data-stack>Left <-> Right 3</div>
+      </div>
+    </section>
+    <section data-stack>
+      <div data-stack-type="top">
+        <div data-stack>Top<->Down Last stack</div>
+      </div>
+    </section>
+  </div>
+  <script type='text/javascript' src='./fullpage-swiper.min.js'></script>
+  <script>
+    // 초기화
+    new Fullpage('#container', {
+      debug: true, // debug mode - default false
+      threshold: 10, // touch detection minimum value
+      dragStart() {
+        console.log('DRAG_START: callback');
+      },
+      dragMove(context) {
+        const { snapshotPositions, stackMoveFromTo } = context
+        console.log('DRAG_MOVE: callback', snapshotPositions, stackMoveFromTo);
+      },
+      dragEnd(context) {
+        // const { snapshotPositions, stackMoveFromTo } = context
+        console.log('DRAG_END: callback');
+      }
+    });
+  </script>
+</body>
+
+</html>
