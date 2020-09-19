@@ -8,12 +8,13 @@
     "example:view": "npm run build:browser && serve examples/browser -p 3000",
     "release": "np"
   },
-  "publishConfig": {
-    "access": "public"
-  },
   "np": {
-    "yarn": false,
-    "contents": "dist"
+    "yarn": false
+  },
+  "homepage": "https://github.com/catalsrun/fullpage-swiper",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/catalsrun/fullpage-swiper.git"
   },
   "keywords": [
     "fullpage-swiper",
