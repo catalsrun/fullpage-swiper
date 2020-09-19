@@ -318,7 +318,6 @@ export default class Fullpage {
   _dragging(target, e) {
     const { type } = target;
     const { clientHeight, clientWidth } = this.viewport;
-
     this.snapshotPositions = {
       top: 0,
       left: 0,
@@ -408,7 +407,7 @@ export default class Fullpage {
         this.draggingRef = stackView[this.eventType.direction];
         return;
       }
-      if (posX <= -clientHeight) {
+      if (posX <= -clientWidth) {
         target.positions.left = -clientWidth;
         target.node.style.left = -clientWidth + 'px';
         // change dragging target
