@@ -6,6 +6,12 @@ Fullpage-swiper is fullpage movement library for browser via touch actions
 npm install -S fullpage-swiper
 ```
 
+## Check examples
+```bash
+npm run example:view
+# go to http://localhost:3000
+```
+
 ## Getting started
 
 ```html
