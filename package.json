@@ -5,6 +5,7 @@
   "main": "dist/fullpage-swiper.min.js",
   "scripts": {
     "build:browser": "webpack && cp dist/fullpage-swiper.min.js examples/browser",
+    "build:watch": "webpack --watch",
     "example:view": "npm run build:browser && serve examples/browser -p 3000",
     "release": "np"
   },

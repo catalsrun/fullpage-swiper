@@ -1,9 +1,6 @@
 import Hammer from 'hammerjs';
 import gsap from 'gsap';
 
-// Constraints
-// - Only one top-level data-stack-type (support list : one of top, left, y, x)
-// - sub-level mark-up structure - [data-stack > data-stack-type] set
 export default class Fullpage {
   static getViewport() {
     return {
@@ -214,6 +211,7 @@ export default class Fullpage {
       const { direction } = eventType;
       const { clientHeight, clientWidth } = this.viewport;
       const t = gsap.timeline();
+
       if (type === 'top') {
         if (direction === 'up') {
           t.to(draggingRef.node, { top: -clientHeight })
@@ -250,19 +248,28 @@ export default class Fullpage {
       if (type === 'y') {
         const y = draggingRef.positions.y;
         if (direction === 'up') {
-          let move = y - clientHeight;
-          const max = -clientHeight * (draggingRef.children.length - 1);
-          if (move < max) move = max;
-
+          const canNext = this.snapshotPositions.y < y;
+          let move = y;
+          if (canNext) {
+            move = y - clientHeight;
+            const max = -clientHeight * (draggingRef.children.length - 1);
+            if (move < max) move = max;
+          }
           t.to(draggingRef.node, { y: move })
-            .add(() => {
-              draggingRef.positions.y = move;
-              this._endCallback();
-            });
+              .add(() => {
+                draggingRef.positions.y = move;
+                this._endCallback();
+              });
+          
         }
         if (direction === 'down') {
-          let move = y + clientHeight;
-          if (move >= 0) move = 0;
+          const canNext = this.snapshotPositions.y > y;
+          let move = y;
+          if (canNext) {
+            move = y + clientHeight;
+            if (move >= 0) move = 0;
+          }
+          
           t.to(draggingRef.node, { y: move })
             .add(() => {
               draggingRef.positions.y = move;
@@ -271,14 +278,17 @@ export default class Fullpage {
         }
       }
 
-      // todo
       if (type === 'x') {
         const x = draggingRef.positions.x;
         if (direction === 'left') {
-          let move = x - clientWidth;
-          const max = -clientWidth * (draggingRef.children.length - 1);
-          if (move < max) move = max;
+          const canNext = this.snapshotPositions.x < x;
 
+          let move = x;
+          if (canNext) {
+            move = x - clientWidth;
+            const max = -clientWidth * (draggingRef.children.length - 1);
+            if (move < max) move = max;
+          }
           t.to(draggingRef.node, { x: move })
             .add(() => {
               draggingRef.positions.x = move;
@@ -286,9 +296,12 @@ export default class Fullpage {
             });
         }
         if (direction === 'right') {
-          let move = x + clientWidth;
-          if (move >= 0) move = 0;
-
+          const canNext = this.snapshotPositions.x > x;
+          let move = x;
+          if (canNext) {
+            move = x + clientWidth;
+            if (move >= 0) move = 0;
+          }
           t.to(draggingRef.node, { x: move })
             .add(() => {
               draggingRef.positions.x = move;
@@ -427,6 +440,7 @@ export default class Fullpage {
       from: null,
       to: null,
       toParent: null,
+      isTopLevelMove: false
     };
     // 모든 이벤트 타켓 node는 currentParent 값이 존재
     // 여기에 lastSeenIndex 값 저장
@@ -447,6 +461,7 @@ export default class Fullpage {
       if (direction === 'up' || direction === 'left') {
         const nextParent = this.parents[findIndex + 1];
         if (nextParent) {
+          result.isTopLevelMove = true;
           if (nextParent.lastSeenIndex) {
             result.to = nextParent.lastSeenIndex;
             result.toParent = nextParent;
@@ -459,6 +474,7 @@ export default class Fullpage {
       if (direction === 'down' || direction === 'right') {
         const nextParent = this.parents[findIndex - 1];
         if (nextParent) {
+          result.isTopLevelMove = true;
           if (nextParent.lastSeenIndex) {
             result.to = nextParent.lastSeenIndex;
             result.toParent = nextParent;
@@ -480,6 +496,7 @@ export default class Fullpage {
           // debugger;
           const nextParent = this.parents[findIndex + 1];
           if (nextParent) {
+            result.isTopLevelMove = true;
             if (nextParent.lastSeenIndex) {
               result.to = nextParent.lastSeenIndex;
               result.toParent = nextParent;
@@ -501,6 +518,7 @@ export default class Fullpage {
         if (canMoveNextParent) {
           const nextParent = this.parents[findIndex - 1];
           if (nextParent) {
+            result.isTopLevelMove = true;
             if (nextParent.lastSeenIndex) {
               result.to = nextParent.lastSeenIndex;
               result.toParent = nextParent;
