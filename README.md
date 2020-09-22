@@ -1,5 +1,5 @@
 # Fullpage-swiper library
-Fullpage-swiper is fullpage movement library for browser via touch actions
+`fullpage-swiper` is fullpage movement library for browser via touch actions
 
 ## install
 ```bash
@@ -15,35 +15,16 @@ npm run examples:view
 ## Getting started
 ```html
 <!-- 
-  markup required
+  HTML markup required, refer to two files
+  - ./examples/pages/top-left.js
+  - ./examples/pages/y-x.js
 -->
-<div id="container" data-stack-type="top">
-  <section data-stack>
-    <div data-stack-type="top">
-      <div data-stack>Top<->Down 1</div>
-      <div data-stack>Top<->Down 2</div>
-      <div data-stack>Top<->Down 3</div>
-    </div>
-  </section>
-  <section data-stack>
-    <div data-stack-type="left">
-      <div data-stack>Left <-> Right 1</div>
-      <div data-stack>Left <-> Right 2</div>
-      <div data-stack>Left <-> Right 3</div>
-    </div>
-  </section>
-  <section data-stack>
-    <div data-stack-type="top">
-      <div data-stack>Top<->Down Last stack</div>
-    </div>
-  </section>
-</div>
 ```
 
 ```javascript
-import Fullpage from 'fullpage-swiper';
+import FullpageSwiper from 'fullpage-swiper';
 
-new Fullpage('#container', {
+new FullpageSwiper('#container', {
   debug: true, // debug mode - default false, remove for production
   threshold: 10, // touch detection minimum value
   dragStart() {
@@ -64,7 +45,7 @@ new Fullpage('#container', {
 ```html
 <script src="https://unpkg.com/fullpage-swiper"><script>
 <script>
-// Use 'Fullpage' global variable.
+// Use 'FullpageSwiper' global variable.
 <script>
 ```
 
