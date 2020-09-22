@@ -1,6 +1,6 @@
 import React from 'react';
 import Head from 'next/head'
-import FullpageSwiper from '../../index'
+import FullpageSwiper from '../../src/index'
 
 class YX extends React.Component {
   componentDidMount() {
