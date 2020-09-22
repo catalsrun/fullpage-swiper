@@ -1,12 +1,9 @@
-import Hammer from 'hammerjs';
-import gsap from 'gsap';
-
-export default class Fullpage {
+export default class FullpageSwiper {
   static getViewport() {
     return {
       // webview issue - undefined : window.innerWidth, window.innerHeight
-      clientWidth: document.documentElement.clientWidth,
-      clientHeight: document.documentElement.clientHeight
+      clientWidth: window.innerWidth || document.documentElement.clientWidth,
+      clientHeight: window.innerHeight || document.documentElement.clientHeight
     };
   }
   static getRandomColor() {
@@ -22,12 +19,16 @@ export default class Fullpage {
     this.containerType = this.containerRef.getAttribute('data-stack-type');
     if (!(this.containerRef && this.containerType)) {
       // eslint-disable-next-line no-console
-      console.error('Fullpage initialization error');
+      console.error(
+        'fullpage-swiper initialization error, check selector',
+        selector
+      );
       return;
     }
     this.containerAxis =
-      this.containerType === 'top' ||
-        this.containerType === 'y' ? 'vertical' : 'horizontal';
+      this.containerType === 'top' || this.containerType === 'y'
+        ? 'vertical'
+        : 'horizontal';
 
     this.options = Object.assign({ debug: false }, options);
 
@@ -38,12 +39,12 @@ export default class Fullpage {
     this.currentIdx = 0;
     this.eventType = {
       axis: '',
-      direction: '',
+      direction: ''
     };
     this.dragging = false;
     this.draggingRef = null;
 
-    this.viewport = Fullpage.getViewport();
+    this.viewport = FullpageSwiper.getViewport();
 
     this.setStacks();
     this.setCommonLayout();
@@ -54,16 +55,7 @@ export default class Fullpage {
 
     this.options.debug && this.debug();
   }
-  removeListeners() {
-
-  }
-  getDragTarget(evtTarget) {
-    let target = this.draggingRef;
-    if (!target) {
-      target = this.stacks.find((child) => child.node === evtTarget);
-    }
-    return target;
-  }
+  removeListeners() {}
   _blockEvent(eventType) {
     // 최초 이벤트 요청일 경우 블록 X
     if (this.eventType.axis === '') {
@@ -95,14 +87,14 @@ export default class Fullpage {
   }
   _panstart(e) {
     this.isDragging = true;
-    const target = this.stacks.find((child) => child.node === e.target);
-    // console.log('START: start', !!target);
-    if (!target) {
+    this.eventTarget = this.stacks.find(
+      stack => stack.node === e.currentTarget
+    );
+    if (!this.eventTarget) {
       this.isDragging = false;
       return;
     }
-    this.options.dragStart(this, target);
-    // Utils.safeCall(config.dragStart);
+    this.options.dragStart(this);
   }
   _panleft(e) {
     const eventType = {
@@ -110,18 +102,18 @@ export default class Fullpage {
       direction: 'left'
     };
     if (this._blockEvent(eventType)) return;
-    // console.log('START:', eventType.direction);
+    console.log('START:', eventType.direction);
     if (!this.draggingRef) {
-      const eventTarget = this._getTargetInfo(e.target);
+      const eventTarget = this.eventTarget;
       if (eventTarget) {
         this.draggingRef = eventTarget.nextStackView[eventType.direction];
         this.eventType.target = eventTarget;
+        console.log('START:', this.draggingRef, eventTarget);
       }
     }
     if (!this.draggingRef) {
       this._resetDrag();
     } else {
-
       // 드로잉 지점
       this._dragging(this.draggingRef, e);
     }
@@ -134,7 +126,7 @@ export default class Fullpage {
     if (this._blockEvent(eventType)) return;
     // console.log('START:', eventType.direction);
     if (!this.draggingRef) {
-      const eventTarget = this._getTargetInfo(e.target);
+      const eventTarget = this.eventTarget;
       if (eventTarget) {
         this.draggingRef = eventTarget.nextStackView[eventType.direction];
         this.eventType.target = eventTarget;
@@ -143,7 +135,6 @@ export default class Fullpage {
     if (!this.draggingRef) {
       this._resetDrag();
     } else {
-
       // 드로잉 지점
       this._dragging(this.draggingRef, e);
     }
@@ -155,7 +146,7 @@ export default class Fullpage {
     };
     if (this._blockEvent(eventType)) return;
     if (!this.draggingRef) {
-      const eventTarget = this._getTargetInfo(e.target);
+      const eventTarget = this.eventTarget;
       if (eventTarget) {
         this.draggingRef = eventTarget.nextStackView[eventType.direction];
         this.eventType.target = eventTarget;
@@ -166,7 +157,6 @@ export default class Fullpage {
     if (!this.draggingRef) {
       this._resetDrag();
     } else {
-
       // 드로잉 지점
       this._dragging(this.draggingRef, e);
     }
@@ -177,26 +167,34 @@ export default class Fullpage {
       direction: 'up'
     };
     if (this._blockEvent(eventType)) return;
-    // console.log('START:', eventType.direction);
 
     if (!this.draggingRef) {
-      const eventTarget = this._getTargetInfo(e.target);
+      const eventTarget = this.eventTarget;
       if (eventTarget) {
         this.draggingRef = eventTarget.nextStackView[eventType.direction];
         this.eventType.target = eventTarget;
       }
     }
+
     if (!this.draggingRef) {
       this._resetDrag();
     } else {
-
       // 드로잉 지점
       this._dragging(this.draggingRef, e);
     }
   }
   _endCallback() {
-    const { toParent, to } = this.stackMoveFromTo;
-    if (toParent && to) toParent.lastSeenIndex = to;
+    const { stackMoveFromTo } = this;
+    let updateTo = stackMoveFromTo.to;
+    if (stackMoveFromTo.toParent) {
+      if (updateTo >= 0) {
+        stackMoveFromTo.toParent.lastSeenIndex = updateTo;
+      } else {
+        // restore
+        stackMoveFromTo.toParent.lastSeenIndex = this.currentIdx;
+        stackMoveFromTo.to = this.currentIdx;
+      }
+    }
     this.options.dragEnd(this);
     this._resetDrag();
   }
@@ -214,34 +212,36 @@ export default class Fullpage {
 
       if (type === 'top') {
         if (direction === 'up') {
-          t.to(draggingRef.node, { top: -clientHeight })
-            .add(() => {
-              draggingRef.positions.top = -clientHeight;
-              this._endCallback();
-            });
+          if (this.eventTarget.node !== draggingRef.node) {
+            this.stackMoveFromTo.to = this.currentIdx;
+          }
+          t.to(draggingRef.node, { top: -clientHeight }).add(() => {
+            draggingRef.positions.top = -clientHeight;
+            this._endCallback();
+          });
         }
         if (direction === 'down') {
-          t.to(draggingRef.node, { top: 0 })
-            .add(() => {
-              draggingRef.positions.top = 0;
-              this._endCallback();
-            });
+          if (this.eventTarget.node === draggingRef.node) {
+            this.stackMoveFromTo.to = this.currentIdx;
+          }
+          t.to(draggingRef.node, { top: 0 }).add(() => {
+            draggingRef.positions.top = 0;
+            this._endCallback();
+          });
         }
       }
       if (type === 'left') {
         if (this.eventType.direction === 'left') {
-          t.to(draggingRef.node, { left: -clientWidth })
-            .add(() => {
-              draggingRef.positions.left = -clientWidth;
-              this._endCallback();
-            });
+          t.to(draggingRef.node, { left: -clientWidth }).add(() => {
+            draggingRef.positions.left = -clientWidth;
+            this._endCallback();
+          });
         }
         if (this.eventType.direction === 'right') {
-          t.to(draggingRef.node, { left: 0 })
-            .add(() => {
-              draggingRef.positions.left = 0;
-              this._endCallback();
-            });
+          t.to(draggingRef.node, { left: 0 }).add(() => {
+            draggingRef.positions.left = 0;
+            this._endCallback();
+          });
         }
       }
 
@@ -254,13 +254,13 @@ export default class Fullpage {
             move = y - clientHeight;
             const max = -clientHeight * (draggingRef.children.length - 1);
             if (move < max) move = max;
+          } else {
+            this.stackMoveFromTo.to = this.currentIdx;
           }
-          t.to(draggingRef.node, { y: move })
-              .add(() => {
-                draggingRef.positions.y = move;
-                this._endCallback();
-              });
-          
+          t.to(draggingRef.node, { y: move }).add(() => {
+            draggingRef.positions.y = move;
+            this._endCallback();
+          });
         }
         if (direction === 'down') {
           const canNext = this.snapshotPositions.y > y;
@@ -268,13 +268,14 @@ export default class Fullpage {
           if (canNext) {
             move = y + clientHeight;
             if (move >= 0) move = 0;
+          } else {
+            this.stackMoveFromTo.to = this.currentIdx;
           }
-          
-          t.to(draggingRef.node, { y: move })
-            .add(() => {
-              draggingRef.positions.y = move;
-              this._endCallback();
-            });
+
+          t.to(draggingRef.node, { y: move }).add(() => {
+            draggingRef.positions.y = move;
+            this._endCallback();
+          });
         }
       }
 
@@ -288,12 +289,13 @@ export default class Fullpage {
             move = x - clientWidth;
             const max = -clientWidth * (draggingRef.children.length - 1);
             if (move < max) move = max;
+          } else {
+            this.stackMoveFromTo.to = this.currentIdx;
           }
-          t.to(draggingRef.node, { x: move })
-            .add(() => {
-              draggingRef.positions.x = move;
-              this._endCallback();
-            });
+          t.to(draggingRef.node, { x: move }).add(() => {
+            draggingRef.positions.x = move;
+            this._endCallback();
+          });
         }
         if (direction === 'right') {
           const canNext = this.snapshotPositions.x > x;
@@ -301,12 +303,13 @@ export default class Fullpage {
           if (canNext) {
             move = x + clientWidth;
             if (move >= 0) move = 0;
+          } else {
+            this.stackMoveFromTo.to = this.currentIdx;
           }
-          t.to(draggingRef.node, { x: move })
-            .add(() => {
-              draggingRef.positions.x = move;
-              this._endCallback();
-            });
+          t.to(draggingRef.node, { x: move }).add(() => {
+            draggingRef.positions.x = move;
+            this._endCallback();
+          });
         }
       }
     } else {
@@ -322,10 +325,11 @@ export default class Fullpage {
       top: 0,
       left: 0,
       x: 0,
-      y: 0,
+      y: 0
     };
     const positions = this.snapshotPositions;
     let posY, posX;
+    const stackView = this.stacks.find(el => el.node === this.eventTarget.node);
     if (type === 'y') {
       posY = e.deltaY + target.positions.y;
 
@@ -333,7 +337,6 @@ export default class Fullpage {
         target.positions.y = 0;
         target.node.style.transform = 'translate3d(0px, 0px, 0px)';
         // change dragging target
-        const stackView = this.stacks.find((el) => el.node === e.target);
         this.draggingRef = stackView[this.eventType.direction];
         return;
       }
@@ -343,7 +346,6 @@ export default class Fullpage {
         target.positions.y = max;
         target.node.style.transform = `translate3d(0px, ${max}px, 0px)`;
         // change dragging target
-        const stackView = this.stacks.find((el) => el.node === e.target);
         this.draggingRef = stackView[this.eventType.direction];
         return;
       }
@@ -358,7 +360,6 @@ export default class Fullpage {
         target.positions.x = 0;
         target.node.style.transform = 'translate3d(0px, 0px, 0px)';
         // change dragging target
-        const stackView = this.stacks.find((el) => el.node === e.target);
         this.draggingRef = stackView[this.eventType.direction];
         return;
       }
@@ -367,7 +368,6 @@ export default class Fullpage {
         target.positions.x = max;
         target.node.style.transform = `translate3d(${max}px, 0px, 0px)`;
         // change dragging target
-        const stackView = this.stacks.find((el) => el.node === e.target);
         this.draggingRef = stackView[this.eventType.direction];
         return;
       }
@@ -380,7 +380,6 @@ export default class Fullpage {
         target.positions.top = 0;
         target.node.style.top = 0 + 'px';
         // change dragging target
-        const stackView = this.stacks.find((el) => el.node === e.target);
         this.draggingRef = stackView[this.eventType.direction];
         return;
       }
@@ -388,7 +387,6 @@ export default class Fullpage {
         target.positions.top = -clientHeight;
         target.node.style.top = -clientHeight + 'px';
         // change dragging target
-        const stackView = this.stacks.find((el) => el.node === e.target);
         this.draggingRef = stackView[this.eventType.direction];
         return;
       }
@@ -403,7 +401,6 @@ export default class Fullpage {
         target.positions.left = 0;
         target.node.style.left = 0 + 'px';
         // change dragging target
-        const stackView = this.stacks.find((el) => el.node === e.target);
         this.draggingRef = stackView[this.eventType.direction];
         return;
       }
@@ -411,7 +408,6 @@ export default class Fullpage {
         target.positions.left = -clientWidth;
         target.node.style.left = -clientWidth + 'px';
         // change dragging target
-        const stackView = this.stacks.find((el) => el.node === e.target);
         this.draggingRef = stackView[this.eventType.direction];
         return;
       }
@@ -421,17 +417,18 @@ export default class Fullpage {
     }
 
     this.stackMoveFromTo = this._getStackMoveFromTo();
+
     this.options.dragMove(this);
     // top 의 경우시
     // siblingIndex 0, posY 0, -1, -2, ... -> end Event 시 -667
     // siblingIndex 0 값은 점점 hide, sliblingindex 1값은 하단 부터 점점 노출
   }
   _getStackMoveFromTo() {
-    // 경계면 이동간의 드래그되는 엘리먼트는 
+    // 경계면 이동간의 드래그되는 엘리먼트는
     // 최상위 엘리먼트 data-stack 또는 최상위 data-stack-type
     const direction = this.eventType.direction;
     const eventAxis = this.eventType.axis;
-    const eventTarget = this.eventType.target;
+    const eventTarget = this.eventTarget;
     const { stackIndex, isFirstNode, isLastNode } = eventTarget;
     const result = {
       direction: direction,
@@ -443,7 +440,9 @@ export default class Fullpage {
     };
     // 모든 이벤트 타켓 node는 currentParent 값이 존재
     // 여기에 lastSeenIndex 값 저장
-    const findIndex = this.parents.findIndex((el) => el.node === eventTarget.innerParent.node);
+    const findIndex = this.parents.findIndex(
+      el => el.node === eventTarget.innerParent.node
+    );
     const currentParent = this.parents[findIndex];
     const isSameDirection =
       (currentParent.axis === 'vertical' && direction === 'up') ||
@@ -453,7 +452,9 @@ export default class Fullpage {
       (currentParent.axis === 'horizontal' && direction === 'right');
 
     const canMoveNextParent = eventAxis === this.containerAxis;
-    const canDirectMoveToParent = currentParent.axis !== eventAxis && canMoveNextParent;
+    const canDirectMoveToParent =
+      currentParent.axis !== eventAxis && canMoveNextParent;
+
     if (canDirectMoveToParent) {
       // 바로 경계면 이동
       result.from = stackIndex;
@@ -465,7 +466,9 @@ export default class Fullpage {
             result.to = nextParent.lastSeenIndex;
             result.toParent = nextParent;
           } else {
-            result.to = currentParent.children[currentParent.children.length - 1].stackIndex + 1;
+            result.to =
+              currentParent.children[currentParent.children.length - 1]
+                .stackIndex + 1;
             result.toParent = nextParent;
           }
         }
@@ -532,18 +535,22 @@ export default class Fullpage {
     return result;
   }
 
-  _getTargetInfo(ref) {
-    return this.stacks.find((stack) => stack.node === ref);
-  }
   _addEvents() {
     const mc = new Hammer(this.containerRef);
     // save mc instance for remove event listeners - mc.off();
     this.hammers.push(mc);
-    mc.add(new Hammer.Pan({
-      direction: Hammer.DIRECTION_ALL,
-      threshold: this.options.threshold
-    }));
-    mc.on('panstart', this._panstart.bind(this));
+    mc.add(
+      new Hammer.Pan({
+        direction: Hammer.DIRECTION_ALL,
+        threshold: this.options.threshold
+      })
+    );
+
+    // Hammer pan event issue : not support event.currentTarget
+    this.stacks.forEach(({ node }) => {
+      node.addEventListener('touchstart', this._panstart.bind(this), false);
+    });
+
     mc.on('panend', this._panend.bind(this));
     mc.on('panleft', this._panleft.bind(this));
     mc.on('panright', this._panright.bind(this));
@@ -562,9 +569,9 @@ export default class Fullpage {
     document.documentElement.style.width = '100%';
   }
   setLayout() {
-    this.viewport = Fullpage.getViewport();
+    this.viewport = FullpageSwiper.getViewport();
     // 부모 컨테이너 layout
-    this.parents.forEach((parent) => {
+    this.parents.forEach(parent => {
       // data-stack-type 에 따라 layout setting
       // x, y, top, left
       switch (parent.type) {
@@ -584,7 +591,6 @@ export default class Fullpage {
   _layoutX(parent) {
     const { clientHeight, clientWidth } = this.viewport;
     const { node, children } = parent;
-    // console.log('_layoutX', el, children);
     node.x = node.y = 0;
     node.style.display = 'flex';
     node.style.overflow = 'hidden';
@@ -608,7 +614,6 @@ export default class Fullpage {
     children.forEach(({ node }) => {
       node.style.height = clientHeight + 'px';
     });
-
   }
   _layoutFixed(parent) {
     const { clientHeight, clientWidth } = this.viewport;
@@ -617,18 +622,20 @@ export default class Fullpage {
     node.style.position = 'relative';
     node.style.height = clientHeight + 'px';
     node.style.width = clientWidth + 'px';
+
     children.forEach(({ node }, idx, arr) => {
       node.style.position = 'absolute';
       node.style.top = 0;
       node.style.left = 0;
-      node.style.height = '100%';
-      node.style.width = '100%';
+      node.style.height = clientHeight + 'px';
+      node.style.width = clientWidth + 'px';
       node.style.zIndex = (arr.length - idx) * 10;
     });
   }
   setStacks() {
     const filter = node => {
-      const isStack = node && typeof node.getAttribute('data-stack') === 'string';
+      const isStack =
+        node && typeof node.getAttribute('data-stack') === 'string';
       // if (isStack) console.log('filtered node', node);
       const result = isStack
         ? NodeFilter.FILTER_ACCEPT
@@ -642,39 +649,78 @@ export default class Fullpage {
       false
     );
 
-    this.parents = Array.from(document.querySelectorAll('[data-stack-type]'))
-      .map((el) => {
-        const type = el.getAttribute('data-stack-type');
-        const direction = (type === 'top' || type === 'y') ? 'vertical' : 'horizontal';
-        const children = Array.from(el.children).filter((el) => {
-          return typeof el.getAttribute('data-stack') === 'string';
-        });
-        const parentNode = el === this.containerRef ? null : el.parentNode;
-        return {
-          type,
-          axis: direction,
-          node: el,
-          children,
-          outerParent: parentNode,
-          positions: {
-            x: 0,
-            y: 0,
-            top: 0,
-            left: 0,
-          },
-        };
-      });
+    this.parents = Array.from(
+      document.querySelectorAll('[data-stack-type]')
+    ).map(el => {
+      const type = el.getAttribute('data-stack-type');
+      const direction =
+        type === 'top' || type === 'y' ? 'vertical' : 'horizontal';
+
+      let children;
+      if (el === this.containerRef) {
+        children = Array.from(el.children).filter(
+          el => typeof el.getAttribute('data-stack') === 'string'
+        );
+      } else {
+        children = Array.from(el.querySelectorAll('[data-stack]')).filter(
+          el => typeof el.getAttribute('data-stack') === 'string'
+        );
+      }
+
+      // const parentNode = el === this.containerRef ? null : el.parentNode;
+      return {
+        type,
+        axis: direction,
+        node: el,
+        children,
+        // outerParent: parentNode,
+        positions: {
+          x: 0,
+          y: 0,
+          top: 0,
+          left: 0
+        }
+      };
+    });
 
     let node = walker.firstChild();
+    // search data-stack element
     while (node !== null) {
-      const parentNode = node.parentNode;
-      const type = parentNode.getAttribute('data-stack-type');
-      const direction = (type === 'top' || type === 'y') ? 'vertical' : 'horizontal';
-      const innerParent = this.parents.find((el) => el.node === parentNode);
+      let parentNode = node.parentNode;
+      let type;
+      while (parentNode !== null) {
+        type = parentNode.getAttribute('data-stack-type');
+        if (type) {
+          break;
+        } else {
+          parentNode = parentNode.parentNode;
+        }
+      }
+
+      const direction =
+        type === 'top' || type === 'y' ? 'vertical' : 'horizontal';
+      const innerParent = this.parents.find(el => {
+        return el.node === parentNode;
+      });
+
+      // console.log("innerParent", innerParent);
       innerParent.isRoot = innerParent.node === this.containerRef;
-      const index = innerParent.children.findIndex((el) => {
+      if (innerParent.node === this.containerRef) {
+        innerParent.outerParent = null;
+      } else {
+        const found = this.parents[0].children.find(child => {
+          return child.node.querySelector('[data-stack-type]');
+        });
+        if (found) {
+          innerParent.outerParent = found;
+        }
+      }
+      // innerParent.node === this.containerRef ? null : parentNode;
+
+      const index = innerParent.children.findIndex(el => {
         return el === node;
       });
+
       const stackView = {
         type,
         axis: direction,
@@ -689,8 +735,8 @@ export default class Fullpage {
           x: 0,
           y: 0,
           top: 0,
-          left: 0,
-        },
+          left: 0
+        }
       };
       innerParent.children[index] = stackView;
 
@@ -713,51 +759,57 @@ export default class Fullpage {
       this.stacks.push(stackView);
     }
 
-    this.stacks = this.stacks.filter((item, _, arr) => {
-      const idx = arr.findIndex((el) => {
-        const outerParent = el.innerParent.outerParent;
-        if (outerParent) return outerParent === item.node;
+    // innerParent.children[index] = stackView;
+
+    this.stacks = this.stacks
+      .filter(item => !item.isRootLevel)
+      .map((item, idx, arr) => {
+        // issue - innerParent.children[index] = stackView;
+        // 동일한 객체를 바라보고 있으므로 mutation 으로 변경
+        item.stackIndex = idx;
+        item.nextStackView = this._setPrevNextTarget(item, arr);
+
+        return item;
       });
-      if (idx >= 0) {
-        arr[idx].innerParent.outerParent = item;
-        return false;
-      }
-      return true;
-    }).map((item, idx, arr) => {
-      // issue - innerParent.children[index] = stackView;
-      // 동일한 객체를 바라보고 있으므로 mutation 으로 변경
-      item.stackIndex = idx;
-      item.nextStackView = this._setPrevNextTarget(item, arr);
-      return item;
-    });
-    // console.log('parents', parents);
-    // console.log('this.stacks', this.stacks);
+
+    // this.parents.forEach(parents => {
+    //   console.log("parents", parents);
+    // });
+
+    console.log('parents', this.parents);
+    console.log('this.stacks', this.stacks);
   }
 
   // 결정론적 - stack 의 타입에 따라 이미 draggable element 를 결정
+
+  // issue : index 3 일때 up 이 셋팅되지 않음
   _setPrevNextTarget(stackView) {
     // console.log('_setPrevNextTarget stackIndex', stackView);
-    // if (stackView.stackIndex === 8) {
-    //   debugger;
-    // }
+    if (stackView.stackIndex === 3) {
+      // debugger;
+    }
     const {
-      stackIndex, siblingIndex,
-      type, axis,
-      isRootLevel, isFirstNode, isLastNode,
+      stackIndex,
+      siblingIndex,
+      type,
+      axis,
+      isRootLevel,
+      isFirstNode,
+      isLastNode,
       innerParent,
-      children,
+      children
     } = stackView;
     const targetToDrag = {
       up: false,
       down: false,
       left: false,
-      right: false,
+      right: false
     };
     stackView.results = {
       up: null,
       down: null,
       left: null,
-      right: null,
+      right: null
     };
 
     if (isRootLevel) {
@@ -806,7 +858,7 @@ export default class Fullpage {
 
       if (axis === 'vertical') {
         // todo - results
-        // **경계면 이동시 처리** 
+        // **경계면 이동시 처리**
         if (!outerParent.isLastNode) {
           if (outerParent.type === 'left') {
             targetToDrag.left = outerParent.children[outerParent.siblingIndex];
@@ -820,7 +872,8 @@ export default class Fullpage {
         // **경계면 이동시 처리**
         if (!outerParent.isFirstNode) {
           if (outerParent.type === 'left') {
-            targetToDrag.right = outerParent.children[outerParent.siblingIndex - 1];
+            targetToDrag.right =
+              outerParent.children[outerParent.siblingIndex - 1];
           }
           if (outerParent.type === 'x') {
             targetToDrag.right = outerParent.innerParent;
@@ -838,7 +891,7 @@ export default class Fullpage {
           stackView.results.up = {
             type,
             from: stackIndex,
-            to: stackIndex + 1,
+            to: stackIndex + 1
           };
         } else {
           // **경계면 이동시 처리**
@@ -862,7 +915,7 @@ export default class Fullpage {
           stackView.results.down = {
             type,
             from: stackIndex,
-            to: stackIndex - 1,
+            to: stackIndex - 1
           };
         } else {
           // **경계면 이동시 처리**
@@ -871,7 +924,8 @@ export default class Fullpage {
           // 최상위 엘리먼트가 첫번째 노드가 아닌 경우
           if (!outerParent.isFirstNode) {
             if (outerParent.type === 'top') {
-              targetToDrag.down = outerParent.children[outerParent.siblingIndex - 1];
+              targetToDrag.down =
+                outerParent.children[outerParent.siblingIndex - 1];
             }
             if (outerParent.type === 'y') {
               targetToDrag.down = outerParent.innerParent;
@@ -892,7 +946,7 @@ export default class Fullpage {
           stackView.results.up = {
             type,
             from: stackIndex,
-            to: stackIndex + 1,
+            to: stackIndex + 1
           };
         } else {
           // 형제 노드들중 마지막 노드인 경우
@@ -917,7 +971,7 @@ export default class Fullpage {
           stackView.results.down = {
             type,
             from: stackIndex,
-            to: stackIndex - 1,
+            to: stackIndex - 1
           };
         } else {
           // **경계면 이동시 처리**
@@ -925,7 +979,8 @@ export default class Fullpage {
           // StackView axis === 'vertical' && type === 'top'
           if (!outerParent.isFirstNode) {
             if (outerParent.type === 'top') {
-              targetToDrag.down = outerParent.children[outerParent.siblingIndex - 1];
+              targetToDrag.down =
+                outerParent.children[outerParent.siblingIndex - 1];
             }
             if (outerParent.type === 'y') {
               targetToDrag.down = outerParent.innerParent;
@@ -944,7 +999,8 @@ export default class Fullpage {
           }
           // 최상위 엘리먼트가 첫번째 노드가 아닌 경우
           if (!outerParent.isFirstNode) {
-            targetToDrag.down = outerParent.children[outerParent.siblingIndex - 1];
+            targetToDrag.down =
+              outerParent.children[outerParent.siblingIndex - 1];
           }
         }
         // **경계면 이동시 처리**
@@ -966,7 +1022,7 @@ export default class Fullpage {
           stackView.results.left = {
             type,
             from: stackIndex,
-            to: stackIndex + 1,
+            to: stackIndex + 1
           };
         } else {
           // **경계면 이동시 처리**
@@ -974,7 +1030,8 @@ export default class Fullpage {
           // StackView axis === 'horizontal'
           if (!outerParent.isLastNode) {
             if (outerParent.type === 'left') {
-              targetToDrag.left = outerParent.children[outerParent.siblingIndex];
+              targetToDrag.left =
+                outerParent.children[outerParent.siblingIndex];
             }
             if (outerParent.type === 'x') {
               targetToDrag.left = outerParent.innerParent;
@@ -991,7 +1048,7 @@ export default class Fullpage {
           stackView.results.right = {
             type,
             from: stackIndex,
-            to: stackIndex - 1,
+            to: stackIndex - 1
           };
         } else {
           // **경계면 이동시 처리**
@@ -999,7 +1056,8 @@ export default class Fullpage {
           // StackView axis === 'horizontal'
           if (!outerParent.isFirstNode) {
             if (outerParent.type === 'left') {
-              targetToDrag.right = outerParent.children[outerParent.siblingIndex - 1];
+              targetToDrag.right =
+                outerParent.children[outerParent.siblingIndex - 1];
             }
             if (outerParent.type === 'x') {
               targetToDrag.right = outerParent.innerParent;
@@ -1018,7 +1076,7 @@ export default class Fullpage {
           stackView.results.left = {
             type,
             from: stackIndex,
-            to: stackIndex + 1,
+            to: stackIndex + 1
           };
         } else {
           // **경계면 이동시 처리**
@@ -1027,7 +1085,8 @@ export default class Fullpage {
           // Stack type === 'left'
           if (!outerParent.isLastNode) {
             if (outerParent.type === 'left') {
-              targetToDrag.left = outerParent.children[outerParent.siblingIndex];
+              targetToDrag.left =
+                outerParent.children[outerParent.siblingIndex];
             }
             if (outerParent.type === 'x') {
               targetToDrag.left = outerParent.innerParent;
@@ -1044,7 +1103,7 @@ export default class Fullpage {
           stackView.results.right = {
             type,
             from: stackIndex,
-            to: stackIndex - 1,
+            to: stackIndex - 1
           };
         } else {
           // **경계면 이동시 처리**
@@ -1053,7 +1112,8 @@ export default class Fullpage {
           // Stack type === 'left'
           if (!outerParent.isFirstNode) {
             if (outerParent.type === 'left') {
-              targetToDrag.right = outerParent.children[outerParent.siblingIndex - 1];
+              targetToDrag.right =
+                outerParent.children[outerParent.siblingIndex - 1];
             }
             if (outerParent.type === 'x') {
               targetToDrag.right = outerParent.innerParent;
@@ -1066,7 +1126,7 @@ export default class Fullpage {
   }
   debug() {
     this.stacks.forEach(el => {
-      const color = Fullpage.getRandomColor();
+      const color = FullpageSwiper.getRandomColor();
       el.node.style.backgroundColor = color;
     });
     // eslint-disable-next-line no-console
@@ -1075,4 +1135,87 @@ export default class Fullpage {
     console.log('STACK_VIEW: ', this.stacks);
     window.fps = this;
   }
+}
+
+function ontouch(el, callback) {
+  var touchsurface = el,
+    dir,
+    swipeType,
+    startX,
+    startY,
+    distX,
+    distY,
+    threshold = 150, //required min distance traveled to be considered swipe
+    restraint = 100, // maximum distance allowed at the same time in perpendicular direction
+    allowedTime = 500, // maximum time allowed to travel that distance
+    elapsedTime,
+    startTime,
+    handletouch = callback || function(evt, dir, phase, swipetype, distance) {};
+
+  touchsurface.addEventListener(
+    'touchstart',
+    function(e) {
+      var touchobj = e.changedTouches[0];
+      dir = 'none';
+      swipeType = 'none';
+      dist = 0;
+      startX = touchobj.pageX;
+      startY = touchobj.pageY;
+      startTime = new Date().getTime(); // record time when finger first makes contact with surface
+      handletouch(e, 'none', 'start', swipeType, 0); // fire callback function with params dir="none", phase="start", swipetype="none" etc
+      e.preventDefault();
+    },
+    false
+  );
+
+  touchsurface.addEventListener(
+    'touchmove',
+    function(e) {
+      var touchobj = e.changedTouches[0];
+      distX = touchobj.pageX - startX; // get horizontal dist traveled by finger while in contact with surface
+      distY = touchobj.pageY - startY; // get vertical dist traveled by finger while in contact with surface
+      if (Math.abs(distX) > Math.abs(distY)) {
+        // if distance traveled horizontally is greater than vertically, consider this a horizontal movement
+        dir = distX < 0 ? 'left' : 'right';
+        handletouch(e, dir, 'move', swipeType, distX); // fire callback function with params dir="left|right", phase="move", swipetype="none" etc
+      } else {
+        // else consider this a vertical movement
+        dir = distY < 0 ? 'up' : 'down';
+        handletouch(e, dir, 'move', swipeType, distY); // fire callback function with params dir="up|down", phase="move", swipetype="none" etc
+      }
+      e.preventDefault(); // prevent scrolling when inside DIV
+    },
+    false
+  );
+
+  touchsurface.addEventListener(
+    'touchend',
+    function(e) {
+      var touchobj = e.changedTouches[0];
+      elapsedTime = new Date().getTime() - startTime; // get time elapsed
+      if (elapsedTime <= allowedTime) {
+        // first condition for awipe met
+        if (Math.abs(distX) >= threshold && Math.abs(distY) <= restraint) {
+          // 2nd condition for horizontal swipe met
+          swipeType = dir; // set swipeType to either "left" or "right"
+        } else if (
+          Math.abs(distY) >= threshold &&
+          Math.abs(distX) <= restraint
+        ) {
+          // 2nd condition for vertical swipe met
+          swipeType = dir; // set swipeType to either "top" or "down"
+        }
+      }
+      // Fire callback function with params dir="left|right|up|down", phase="end", swipetype=dir etc:
+      handletouch(
+        e,
+        dir,
+        'end',
+        swipeType,
+        dir == 'left' || dir == 'right' ? distX : distY
+      );
+      e.preventDefault();
+    },
+    false
+  );
 }

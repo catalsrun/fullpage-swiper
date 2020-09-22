@@ -1,0 +1,19 @@
+{
+  "name": "examples",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "next dev",
+    "build": "next build && next export -o build",
+    "serve": "npx serve ./build"
+  },
+  "dependencies": {
+    "next": "9.5.3",
+    "react": "16.13.1",
+    "react-dom": "16.13.1"
+  },
+  "devDependencies": {
+    "gsap": "^3.5.1",
+    "hammerjs": "^2.0.8"
+  }
+}

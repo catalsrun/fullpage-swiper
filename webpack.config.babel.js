@@ -3,14 +3,14 @@ const path = require('path');
 export default () => (
   {
     mode: 'production',
-    entry: './index.js',
+    entry: './src/index.js',
     output: {
       path: path.resolve(__dirname, './dist'),
       filename: 'fullpage-swiper.min.js',
       libraryTarget: 'umd',
       globalObject: 'this',
             // libraryExport: 'default',
-      library: 'Fullpage'
+      library: 'FullpageSwiper'
     },
     externals: {
       'gsap': {
