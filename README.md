@@ -1,7 +1,10 @@
 # Fullpage-swiper library
 `fullpage-swiper` is fullpage movement library for browser via touch actions
 
-## install
+## Demo site (Currently, support mobile drag event only)
+https://fullpage-swiper.netlify.app/
+
+## Install
 ```bash
 npm install -S fullpage-swiper
 ```
