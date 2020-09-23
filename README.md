@@ -8,8 +8,12 @@ npm install -S fullpage-swiper
 
 ## Check examples
 ```bash
-npm run examples:view
-# go to http://localhost:3000
+git clone https://github.com/catalsrun/fullpage-swiper.git
+cd fullpage-swiper
+cd examples
+npm install
+npm start
+# Go to http://localhost:3000
 ```
 
 ## Getting started
@@ -32,11 +36,10 @@ new FullpageSwiper('#container', {
   },
   dragMove(context) {
     const { snapshotPositions, stackMoveFromTo } = context
-    console.log('DRAG_MOVE: callback', snapshotPositions, stackMoveFromTo);
+    // console.log('DRAG_MOVE: callback', snapshotPositions, stackMoveFromTo);
   },
   dragEnd(context) {
-    // const { snapshotPositions, stackMoveFromTo } = context
-    console.log('DRAG_END: callback');
+    console.log('DRAG_END: callback', context.currentIdx);
   }
 });
 ```
