@@ -14,17 +14,12 @@ cd examples
 npm install
 npm start
 # Go to http://localhost:3000
+# Check two files
+#  - examples/pages/top-left.js
+#  - examples/pages/y-x.js
 ```
 
 ## Getting started
-```html
-<!-- 
-  HTML markup required, refer to two files
-  - ./examples/pages/top-left.js
-  - ./examples/pages/y-x.js
--->
-```
-
 ```javascript
 import FullpageSwiper from 'fullpage-swiper';
 
@@ -65,3 +60,11 @@ new FullpageSwiper('#container', {
 - left : position absolute based movement via top value (data-stack element)
 - y : transform based movement via transformY value (data-stack-type element)
 - x : transform based movement via transformX value (data-stack-type element)
+
+## Current features
+- drag event
+
+## Todo features
+- touch swipe event
+- mousewheel event
+- keydown event
