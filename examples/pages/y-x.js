@@ -1,10 +1,10 @@
 import React from 'react';
 import Head from 'next/head'
-import FullpageSwiper from '../../src/index'
 
 class YX extends React.Component {
   componentDidMount() {
-    // 초기화
+    const FullpageSwiper = require('../../src/index').default;
+
     new FullpageSwiper('#fullpage', {
       debug: true, // debug mode - default false
       threshold: 10, // touch detection minimum value
@@ -13,11 +13,11 @@ class YX extends React.Component {
       },
       dragMove(context) {
         const { snapshotPositions, stackMoveFromTo } = context
-        console.log('DRAG_MOVE: callback', snapshotPositions, stackMoveFromTo);
+        // console.log('DRAG_MOVE: callback', snapshotPositions, stackMoveFromTo);
       },
       dragEnd(context) {
         // const { snapshotPositions, stackMoveFromTo } = context
-        console.log('DRAG_END: callback');
+        console.log('DRAG_END: callback', context.currentIdx);
       }
     });
   }

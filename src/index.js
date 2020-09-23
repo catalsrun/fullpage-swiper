@@ -1,3 +1,6 @@
+import Hammer from 'hammerjs';
+import gsap from 'gsap';
+
 export default class FullpageSwiper {
   static getViewport() {
     return {
@@ -25,6 +28,14 @@ export default class FullpageSwiper {
       );
       return;
     }
+    if (!Hammer || !gsap) {
+      // eslint-disable-next-line no-console
+      console.error(
+        '"Hammer" and "gsap" peerDependencies are required'
+      );
+      return;
+    }
+    this.dep = { Hammer, gsap };
     this.containerAxis =
       this.containerType === 'top' || this.containerType === 'y'
         ? 'vertical'
@@ -46,6 +57,7 @@ export default class FullpageSwiper {
 
     this.viewport = FullpageSwiper.getViewport();
 
+    this.setParents();
     this.setStacks();
     this.setCommonLayout();
     this.setLayout();
@@ -85,6 +97,17 @@ export default class FullpageSwiper {
     };
     this.draggingRef = null;
   }
+  _getDraggingInfo(eventTarget) {
+    if (eventTarget) {
+      // obj { from, to, draggable }
+      let obj = eventTarget.canMoveToSibling[this.eventType.direction];
+      if (!obj) {
+        obj = eventTarget.canMoveToParent[this.eventType.direction];
+      }
+      return obj; 
+    }
+    return {};
+  }
   _panstart(e) {
     this.isDragging = true;
     this.eventTarget = this.stacks.find(
@@ -102,20 +125,17 @@ export default class FullpageSwiper {
       direction: 'left'
     };
     if (this._blockEvent(eventType)) return;
-    console.log('START:', eventType.direction);
+    // console.log('START:', eventType.direction);
+    
     if (!this.draggingRef) {
-      const eventTarget = this.eventTarget;
-      if (eventTarget) {
-        this.draggingRef = eventTarget.nextStackView[eventType.direction];
-        this.eventType.target = eventTarget;
-        console.log('START:', this.draggingRef, eventTarget);
-      }
+      this.draggingInfo = this._getDraggingInfo(this.eventTarget);
+      this.draggingRef = this.draggingInfo.draggable;
     }
+
     if (!this.draggingRef) {
       this._resetDrag();
     } else {
-      // 드로잉 지점
-      this._dragging(this.draggingRef, e);
+      this._dragging(this.draggingInfo, e);
     }
   }
   _panright(e) {
@@ -126,17 +146,14 @@ export default class FullpageSwiper {
     if (this._blockEvent(eventType)) return;
     // console.log('START:', eventType.direction);
     if (!this.draggingRef) {
-      const eventTarget = this.eventTarget;
-      if (eventTarget) {
-        this.draggingRef = eventTarget.nextStackView[eventType.direction];
-        this.eventType.target = eventTarget;
-      }
+      this.draggingInfo = this._getDraggingInfo(this.eventTarget);
+      this.draggingRef = this.draggingInfo.draggable;
     }
+
     if (!this.draggingRef) {
       this._resetDrag();
     } else {
-      // 드로잉 지점
-      this._dragging(this.draggingRef, e);
+      this._dragging(this.draggingInfo, e);
     }
   }
   _pandown(e) {
@@ -145,42 +162,36 @@ export default class FullpageSwiper {
       direction: 'down'
     };
     if (this._blockEvent(eventType)) return;
-    if (!this.draggingRef) {
-      const eventTarget = this.eventTarget;
-      if (eventTarget) {
-        this.draggingRef = eventTarget.nextStackView[eventType.direction];
-        this.eventType.target = eventTarget;
-      }
-    }
     // console.log('START:', eventType.direction, this.draggingRef);
+    if (!this.draggingRef) {
+      this.draggingInfo = this._getDraggingInfo(this.eventTarget);
+      this.draggingRef = this.draggingInfo.draggable;
+    }
 
     if (!this.draggingRef) {
       this._resetDrag();
     } else {
-      // 드로잉 지점
-      this._dragging(this.draggingRef, e);
+      this._dragging(this.draggingInfo, e);
     }
   }
+  
   _panup(e) {
     const eventType = {
       axis: 'vertical',
       direction: 'up'
     };
     if (this._blockEvent(eventType)) return;
+    // console.log('from to', data.from, data.to);
 
     if (!this.draggingRef) {
-      const eventTarget = this.eventTarget;
-      if (eventTarget) {
-        this.draggingRef = eventTarget.nextStackView[eventType.direction];
-        this.eventType.target = eventTarget;
-      }
+      this.draggingInfo = this._getDraggingInfo(this.eventTarget);
+      this.draggingRef = this.draggingInfo.draggable;
     }
 
     if (!this.draggingRef) {
       this._resetDrag();
     } else {
-      // 드로잉 지점
-      this._dragging(this.draggingRef, e);
+      this._dragging(this.draggingInfo, e);
     }
   }
   _endCallback() {
@@ -190,11 +201,13 @@ export default class FullpageSwiper {
       if (updateTo >= 0) {
         stackMoveFromTo.toParent.lastSeenIndex = updateTo;
       } else {
-        // restore
+        // Restore
         stackMoveFromTo.toParent.lastSeenIndex = this.currentIdx;
         stackMoveFromTo.to = this.currentIdx;
       }
     }
+    this.currentIdx = stackMoveFromTo.to;
+    
     this.options.dragEnd(this);
     this._resetDrag();
   }
@@ -208,7 +221,7 @@ export default class FullpageSwiper {
       const { type } = draggingRef;
       const { direction } = eventType;
       const { clientHeight, clientWidth } = this.viewport;
-      const t = gsap.timeline();
+      const t = this.dep.gsap.timeline();
 
       if (type === 'top') {
         if (direction === 'up') {
@@ -318,9 +331,11 @@ export default class FullpageSwiper {
   }
   // this.distance 값에 따라 드래그 가동범위 셋팅 가능하도록
   // Math.abs(e.deltaY), Math.abs(e.deltaX)
-  _dragging(target, e) {
+  _dragging({ from, to, changeableTo }, e) {
+    const target = this.draggingRef;
     const { type } = target;
     const { clientHeight, clientWidth } = this.viewport;
+
     this.snapshotPositions = {
       top: 0,
       left: 0,
@@ -332,12 +347,12 @@ export default class FullpageSwiper {
     const stackView = this.stacks.find(el => el.node === this.eventTarget.node);
     if (type === 'y') {
       posY = e.deltaY + target.positions.y;
-
       if (posY >= 0) {
         target.positions.y = 0;
         target.node.style.transform = 'translate3d(0px, 0px, 0px)';
         // change dragging target
-        this.draggingRef = stackView[this.eventType.direction];
+        this.draggingInfo = this._getDraggingInfo(stackView);
+        this.draggingRef = this.draggingInfo.draggable;
         return;
       }
 
@@ -346,13 +361,14 @@ export default class FullpageSwiper {
         target.positions.y = max;
         target.node.style.transform = `translate3d(0px, ${max}px, 0px)`;
         // change dragging target
-        this.draggingRef = stackView[this.eventType.direction];
+        const draggingInfo = this._getDraggingInfo(stackView);
+        this.draggingRef = draggingInfo.draggable;
         return;
       }
 
       // 실제 그려짐
       positions.y = posY;
-      gsap.set(target.node, { y: posY });
+      this.dep.gsap.set(target.node, { y: posY });
     }
     if (type === 'x') {
       posX = e.deltaX + target.positions.x;
@@ -360,7 +376,8 @@ export default class FullpageSwiper {
         target.positions.x = 0;
         target.node.style.transform = 'translate3d(0px, 0px, 0px)';
         // change dragging target
-        this.draggingRef = stackView[this.eventType.direction];
+        this.draggingInfo = this._getDraggingInfo(stackView);
+        this.draggingRef = this.draggingInfo.draggable;
         return;
       }
       const max = -clientWidth * (target.children.length - 1);
@@ -368,11 +385,12 @@ export default class FullpageSwiper {
         target.positions.x = max;
         target.node.style.transform = `translate3d(${max}px, 0px, 0px)`;
         // change dragging target
-        this.draggingRef = stackView[this.eventType.direction];
+        this.draggingInfo = this._getDraggingInfo(stackView);
+        this.draggingRef = this.draggingInfo.draggable;
         return;
       }
       positions.x = posX;
-      gsap.set(target.node, { x: posX });
+      this.dep.gsap.set(target.node, { x: posX });
     }
     if (type === 'top') {
       posY = e.deltaY + target.positions.top;
@@ -380,19 +398,21 @@ export default class FullpageSwiper {
         target.positions.top = 0;
         target.node.style.top = 0 + 'px';
         // change dragging target
-        this.draggingRef = stackView[this.eventType.direction];
+        this.draggingInfo = this._getDraggingInfo(stackView);
+        this.draggingRef = this.draggingInfo.draggable;
         return;
       }
       if (posY <= -clientHeight) {
         target.positions.top = -clientHeight;
         target.node.style.top = -clientHeight + 'px';
         // change dragging target
-        this.draggingRef = stackView[this.eventType.direction];
+        this.draggingInfo = this._getDraggingInfo(stackView);
+        this.draggingRef = this.draggingInfo.draggable;
         return;
       }
 
       positions.top = posY;
-      gsap.set(target.node, { top: posY });
+      this.dep.gsap.set(target.node, { top: posY });
     }
 
     if (type === 'left') {
@@ -401,150 +421,66 @@ export default class FullpageSwiper {
         target.positions.left = 0;
         target.node.style.left = 0 + 'px';
         // change dragging target
-        this.draggingRef = stackView[this.eventType.direction];
+        this.draggingInfo = this._getDraggingInfo(stackView);
+        this.draggingRef = this.draggingInfo.draggable;
         return;
       }
       if (posX <= -clientWidth) {
         target.positions.left = -clientWidth;
         target.node.style.left = -clientWidth + 'px';
         // change dragging target
-        this.draggingRef = stackView[this.eventType.direction];
+        this.draggingInfo = this._getDraggingInfo(stackView);
+        this.draggingRef = this.draggingInfo.draggable;
         return;
       }
 
       positions.left = posX;
-      gsap.set(target.node, { left: posX });
+      this.dep.gsap.set(target.node, { left: posX });
     }
 
-    this.stackMoveFromTo = this._getStackMoveFromTo();
-
+    this.stackMoveFromTo = this._getStackMoveFromTo(from, to, changeableTo);
     this.options.dragMove(this);
     // top 의 경우시
     // siblingIndex 0, posY 0, -1, -2, ... -> end Event 시 -667
     // siblingIndex 0 값은 점점 hide, sliblingindex 1값은 하단 부터 점점 노출
   }
-  _getStackMoveFromTo() {
-    // 경계면 이동간의 드래그되는 엘리먼트는
-    // 최상위 엘리먼트 data-stack 또는 최상위 data-stack-type
-    const direction = this.eventType.direction;
-    const eventAxis = this.eventType.axis;
-    const eventTarget = this.eventTarget;
-    const { stackIndex, isFirstNode, isLastNode } = eventTarget;
+  _getStackMoveFromTo(from, to, changeableTo) {
     const result = {
-      direction: direction,
-      type: this.draggingRef.type,
-      from: null,
-      to: null,
-      toParent: null,
-      isTopLevelMove: false
+      from,
     };
-    // 모든 이벤트 타켓 node는 currentParent 값이 존재
-    // 여기에 lastSeenIndex 값 저장
-    const findIndex = this.parents.findIndex(
-      el => el.node === eventTarget.innerParent.node
-    );
-    const currentParent = this.parents[findIndex];
-    const isSameDirection =
-      (currentParent.axis === 'vertical' && direction === 'up') ||
-      (currentParent.axis === 'horizontal' && direction === 'left');
-    const isSameReverseDirection =
-      (currentParent.axis === 'vertical' && direction === 'down') ||
-      (currentParent.axis === 'horizontal' && direction === 'right');
-
-    const canMoveNextParent = eventAxis === this.containerAxis;
-    const canDirectMoveToParent =
-      currentParent.axis !== eventAxis && canMoveNextParent;
-
-    if (canDirectMoveToParent) {
-      // 바로 경계면 이동
-      result.from = stackIndex;
-      if (direction === 'up' || direction === 'left') {
-        const nextParent = this.parents[findIndex + 1];
-        if (nextParent) {
-          result.isTopLevelMove = true;
-          if (nextParent.lastSeenIndex) {
-            result.to = nextParent.lastSeenIndex;
-            result.toParent = nextParent;
-          } else {
-            result.to =
-              currentParent.children[currentParent.children.length - 1]
-                .stackIndex + 1;
-            result.toParent = nextParent;
-          }
-        }
-      }
-      if (direction === 'down' || direction === 'right') {
-        const nextParent = this.parents[findIndex - 1];
-        if (nextParent) {
-          result.isTopLevelMove = true;
-          if (nextParent.lastSeenIndex) {
-            result.to = nextParent.lastSeenIndex;
-            result.toParent = nextParent;
-          } else {
-            result.to = currentParent.children[0].stackIndex - 1;
-            result.toParent = nextParent;
-          }
-        }
-      }
-    }
-
-    if (isSameDirection) {
-      result.from = stackIndex;
-      if (!isLastNode) {
-        result.to = stackIndex + 1;
-        result.toParent = currentParent;
-      } else {
-        if (canMoveNextParent) {
-          // debugger;
-          const nextParent = this.parents[findIndex + 1];
-          if (nextParent) {
-            result.isTopLevelMove = true;
-            if (nextParent.lastSeenIndex) {
-              result.to = nextParent.lastSeenIndex;
-              result.toParent = nextParent;
-            } else {
-              result.to = stackIndex + 1;
-              result.toParent = nextParent;
-            }
-          }
-        }
-      }
-    }
-
-    if (isSameReverseDirection) {
-      result.from = stackIndex;
-      if (!isFirstNode) {
-        result.to = stackIndex - 1;
-        result.toParent = currentParent;
-      } else {
-        if (canMoveNextParent) {
-          const nextParent = this.parents[findIndex - 1];
-          if (nextParent) {
-            result.isTopLevelMove = true;
-            if (nextParent.lastSeenIndex) {
-              result.to = nextParent.lastSeenIndex;
-              result.toParent = nextParent;
-            } else {
-              result.to = stackIndex - 1;
-              result.toParent = nextParent;
-            }
-          }
-        }
-      }
+    if (to !== undefined) {
+      const toParent = this.stacks[to].innerParent;
+      result.to = to;
+      result.toParent = toParent;
+    } else if (changeableTo !== undefined) {
+      const toParent = this.stacks[changeableTo].innerParent;
+      result.to = toParent.lastSeenIndex ? toParent.lastSeenIndex : changeableTo;
+      result.toParent = toParent;
     }
     return result;
   }
 
   _addEvents() {
-    const mc = new Hammer(this.containerRef);
+    // mobile 일 경우
+    // touchstart, touchmove, touchend 3가지 등록
+
+    // pc 일 경우
+    // DOMMouseScroll mousewheel
+    // mousedown, mousemove, mouseup
+    // keydown
+
+    // resizeComplete 시 currentIdx 로 이동
+
+    const mc = new this.dep.Hammer(this.containerRef);
     // save mc instance for remove event listeners - mc.off();
     this.hammers.push(mc);
     mc.add(
-      new Hammer.Pan({
-        direction: Hammer.DIRECTION_ALL,
+      new this.dep.Hammer.Pan({
+        direction: this.dep.Hammer.DIRECTION_ALL,
         threshold: this.options.threshold
       })
     );
+    // console.log(2);
 
     // Hammer pan event issue : not support event.currentTarget
     this.stacks.forEach(({ node }) => {
@@ -558,15 +494,15 @@ export default class FullpageSwiper {
     mc.on('panup', this._panup.bind(this));
   }
   setCommonLayout() {
-    // block x,y scrolling
-    document.body.style.overflow = 'hidden';
-    document.body.style.height = '100%';
-    document.body.style.width = '100%';
-
-    // required in samsung internet browser
+    // Block x,y scrolling
+    // Required in Samsung Internet browser
     document.documentElement.style.overflow = 'hidden';
     document.documentElement.style.height = '100%';
     document.documentElement.style.width = '100%';
+
+    document.body.style.overflow = 'hidden';
+    document.body.style.height = '100%';
+    document.body.style.width = '100%';
   }
   setLayout() {
     this.viewport = FullpageSwiper.getViewport();
@@ -605,7 +541,6 @@ export default class FullpageSwiper {
   _layoutY(parent) {
     const { clientHeight } = this.viewport;
     const { node, children } = parent;
-    // console.log('_layoutY', el, children);
     node.x = node.y = 0;
     node.style.overflow = 'hidden';
     node.style.position = 'relative';
@@ -632,48 +567,32 @@ export default class FullpageSwiper {
       node.style.zIndex = (arr.length - idx) * 10;
     });
   }
-  setStacks() {
-    const filter = node => {
-      const isStack =
-        node && typeof node.getAttribute('data-stack') === 'string';
-      // if (isStack) console.log('filtered node', node);
-      const result = isStack
-        ? NodeFilter.FILTER_ACCEPT
-        : NodeFilter.FILTER_SKIP;
-      return result;
-    };
-    const walker = document.createTreeWalker(
-      this.containerRef,
-      NodeFilter.SHOW_ELEMENT,
-      filter,
-      false
-    );
-
+  setParents() {
     this.parents = Array.from(
       document.querySelectorAll('[data-stack-type]')
-    ).map(el => {
-      const type = el.getAttribute('data-stack-type');
-      const direction =
+    ).map(parent => {
+      const type = parent.getAttribute('data-stack-type');
+      const axis =
         type === 'top' || type === 'y' ? 'vertical' : 'horizontal';
 
-      let children;
-      if (el === this.containerRef) {
-        children = Array.from(el.children).filter(
-          el => typeof el.getAttribute('data-stack') === 'string'
-        );
+      let children = [];
+      // if parent is root parent
+      if (parent === this.containerRef) {
+        children = Array
+          .from(parent.children)
+          .filter(el => typeof el.getAttribute('data-stack') === 'string');
       } else {
-        children = Array.from(el.querySelectorAll('[data-stack]')).filter(
-          el => typeof el.getAttribute('data-stack') === 'string'
-        );
+        children = Array
+          .from(parent.querySelectorAll('[data-stack]'))
+          .filter(el => typeof el.getAttribute('data-stack') === 'string');
       }
 
-      // const parentNode = el === this.containerRef ? null : el.parentNode;
       return {
         type,
-        axis: direction,
-        node: el,
+        axis,
+        node: parent,
+        isRoot: parent === this.containerRef,
         children,
-        // outerParent: parentNode,
         positions: {
           x: 0,
           y: 0,
@@ -682,9 +601,30 @@ export default class FullpageSwiper {
         }
       };
     });
+  }
+  setStacks() {
+    // filter function - only [data-stack] element
+    const filter = node => {
+      const isStack =
+        node && typeof node.getAttribute('data-stack') === 'string';
+      
+      const result = isStack
+        ? NodeFilter.FILTER_ACCEPT
+        : NodeFilter.FILTER_SKIP;
+     
+      return result;
+    };
+    
+    const walker = document.createTreeWalker(
+      this.containerRef,
+      NodeFilter.SHOW_ELEMENT,
+      filter,
+      false
+    );
 
+    // node is [data-stack] element
     let node = walker.firstChild();
-    // search data-stack element
+    let idx = 0;
     while (node !== null) {
       let parentNode = node.parentNode;
       let type;
@@ -697,40 +637,37 @@ export default class FullpageSwiper {
         }
       }
 
-      const direction =
-        type === 'top' || type === 'y' ? 'vertical' : 'horizontal';
-      const innerParent = this.parents.find(el => {
-        return el.node === parentNode;
-      });
+      const isVertical = type === 'top' || type === 'y';
+      const direction = isVertical ? 'vertical' : 'horizontal';
+      const innerParentIndex = this.parents.findIndex(p => p.node === parentNode);
+      const innerParent = this.parents[innerParentIndex];
 
-      // console.log("innerParent", innerParent);
-      innerParent.isRoot = innerParent.node === this.containerRef;
       if (innerParent.node === this.containerRef) {
         innerParent.outerParent = null;
       } else {
-        const found = this.parents[0].children.find(child => {
-          return child.node.querySelector('[data-stack-type]');
+        // data-stack (this is outerParent) > data-stack-type (this is innerParent)
+        const outerParent = this.parents[0].children.find(outer => {
+          return outer.node.querySelector('[data-stack-type]') === parentNode;
         });
-        if (found) {
-          innerParent.outerParent = found;
+        if (outerParent) {
+          innerParent.outerParent = outerParent;
         }
       }
-      // innerParent.node === this.containerRef ? null : parentNode;
 
-      const index = innerParent.children.findIndex(el => {
-        return el === node;
-      });
-
+      const siblingIndex = innerParent.children.findIndex(el => el === node);
       const stackView = {
         type,
         axis: direction,
         node, // for e.target
-        siblingIndex: index,
+        siblingIndex,
         innerParent,
-        isRootLevel: innerParent.outerParent === null,
+        innerParentIndex,
+        isRootLevel: innerParent.isRoot,
+        isRootLevelStack: innerParent.isRoot,
         children: innerParent.children,
-        isFirstNode: node.previousElementSibling === null,
-        isLastNode: node.nextElementSibling === null,
+        isFirstNode: siblingIndex === 0,
+        isLastNode: siblingIndex === innerParent.children.length - 1,
+        requestEvents: {},
         positions: {
           x: 0,
           y: 0,
@@ -738,7 +675,7 @@ export default class FullpageSwiper {
           left: 0
         }
       };
-      innerParent.children[index] = stackView;
+      innerParent.children[siblingIndex] = stackView;
 
       const child = walker.firstChild();
       if (child) {
@@ -755,33 +692,166 @@ export default class FullpageSwiper {
           }
         }
       }
-
-      this.stacks.push(stackView);
+      if (!stackView.isRootLevelStack) {
+        stackView.stackIndex = idx++;
+        stackView.canMoveToSibling = this._canMoveToSibling(stackView);
+        this.stacks.push(stackView);
+      }
     }
 
-    // innerParent.children[index] = stackView;
-
-    this.stacks = this.stacks
-      .filter(item => !item.isRootLevel)
-      .map((item, idx, arr) => {
-        // issue - innerParent.children[index] = stackView;
-        // 동일한 객체를 바라보고 있으므로 mutation 으로 변경
-        item.stackIndex = idx;
-        item.nextStackView = this._setPrevNextTarget(item, arr);
-
-        return item;
-      });
-
-    // this.parents.forEach(parents => {
-    //   console.log("parents", parents);
-    // });
-
-    console.log('parents', this.parents);
-    console.log('this.stacks', this.stacks);
+    this.stacks.forEach((item, _, arr) => {
+      item.canMoveToParent = this._canMoveToParent(item);
+      item.nextStackView = this._setPrevNextTarget(item, arr);
+    });
   }
+  _canMoveToParent(stack) {
+    const axis = this.parents[0].axis;
+    const type = this.parents[0].type;
 
+    const { canMoveToSibling, innerParent, innerParentIndex } = stack;
+    const { outerParent } = innerParent;
+    const result = {
+      up: !canMoveToSibling.up && axis === 'vertical' && !outerParent.isLastNode,
+      down: !canMoveToSibling.down && axis === 'vertical' && !outerParent.isFirstNode,
+      left: !canMoveToSibling.left && axis === 'horizontal' && !outerParent.isLastNode,
+      right: !canMoveToSibling.right && axis === 'horizontal' && !outerParent.isFirstNode
+    };
+
+    if (result.up) {
+      result.up = { 
+        from: stack.stackIndex
+      };
+      if (type === 'y') {
+        result.up.draggable = outerParent.innerParent;
+      }
+      if (type === 'top') {
+        result.up.draggable = outerParent;
+      }
+      const nextParent = this.parents[innerParentIndex + 1];
+      if (nextParent.axis === axis) {
+        result.up.to = nextParent.children[0].stackIndex;
+      } else {
+        result.up.changeableTo = nextParent.children[0].stackIndex;
+        // 도착지가 다른 축인 경우
+        // - vertical -> horizontal
+      }
+    }
+    if (result.left) {
+      result.left = { 
+        from: stack.stackIndex
+      };
+      if (type === 'x') {
+        result.left.draggable = outerParent.innerParent;
+      }
+      if (type === 'left') {
+        result.left.draggable = outerParent;
+      }
+      const nextParent = this.parents[innerParentIndex + 1];
+      if (nextParent.axis === axis) {
+        result.left.to = nextParent.children[0].stackIndex;
+      } else {
+        // 도착지가 다른 축인 경우
+        // - horizontal -> vertical
+        result.left.changeableTo = nextParent.children[0].stackIndex;
+      }
+    }
+
+    if (result.down) {
+      result.down = { 
+        from: stack.stackIndex
+      };
+      if (type === 'y') {
+        result.down.draggable = outerParent.innerParent;
+      }
+      const nextParent = this.parents[innerParentIndex - 1];
+      if (type === 'top') {
+        const draggable = nextParent.outerParent;
+        result.down.draggable = draggable;
+      }
+      if (nextParent.axis === axis) {
+        result.down.to = nextParent.children[nextParent.children.length - 1].stackIndex;
+      } else {
+        // 도착지가 다른 축인 경우
+        // - horizontal -> vertical
+        result.down.changeableTo = nextParent.children[nextParent.children.length - 1].stackIndex;
+      }
+    }
+
+    if (result.right) {
+      result.right = { 
+        from: stack.stackIndex
+      };
+      if (type === 'x') {
+        result.right.draggable = outerParent.innerParent;
+      }
+      const nextParent = this.parents[innerParentIndex - 1];
+      if (type === 'left') {
+        const draggable = nextParent.outerParent;
+        result.right.draggable = draggable;
+      }
+      if (nextParent.axis === axis) {
+        result.right.to = nextParent.children[nextParent.children.length - 1].stackIndex;
+      } else {
+        // 도착지가 다른 축인 경우
+        // - vertical -> horizontal
+        result.right.changeableTo = nextParent.children[nextParent.children.length - 1].stackIndex;
+      }
+    }
+
+    return result;
+  }
+  _canMoveToSibling(stack) {
+    const axis = stack.innerParent.axis;
+    const type = stack.innerParent.type;
+    const result = {
+      up: axis === 'vertical' && !stack.isLastNode,
+      down: axis === 'vertical' && !stack.isFirstNode,
+      left: axis === 'horizontal' && !stack.isLastNode,
+      right: axis === 'horizontal' && !stack.isFirstNode,
+    };
+    if (result.up) {
+      result.up = { 
+        from: stack.stackIndex, to: stack.stackIndex + 1
+      };
+      if (type === 'y') {
+        result.up.draggable = stack.innerParent;
+      }
+      if (type === 'top') {
+        result.up.draggable = stack;
+      }
+    }
+    if (result.left) {
+      result.left = { from: stack.stackIndex, to: stack.stackIndex + 1 };
+      if (type === 'x') {
+        result.left.draggable = stack.innerParent;
+      }
+      if (type === 'left') {
+        result.left.draggable = stack;
+      }
+    }
+
+    if (result.down) {
+      result.down = { from: stack.stackIndex, to: stack.stackIndex - 1 };
+      if (type === 'y') {
+        result.down.draggable = stack.innerParent;
+      }
+      if (type === 'top') {
+        result.down.draggable = this.stacks[stack.stackIndex - 1];
+      }
+    }
+    if (result.right) {
+      result.right = { from: stack.stackIndex, to: stack.stackIndex - 1 };
+      if (type === 'x') {
+        result.right.draggable = stack.innerParent;
+      }
+      if (type === 'left') {
+        result.right.draggable = this.stacks[stack.stackIndex - 1];
+      }
+    }
+    return result;
+  }
+ 
   // 결정론적 - stack 의 타입에 따라 이미 draggable element 를 결정
-
   // issue : index 3 일때 up 이 셋팅되지 않음
   _setPrevNextTarget(stackView) {
     // console.log('_setPrevNextTarget stackIndex', stackView);
@@ -1135,87 +1205,4 @@ export default class FullpageSwiper {
     console.log('STACK_VIEW: ', this.stacks);
     window.fps = this;
   }
-}
-
-function ontouch(el, callback) {
-  var touchsurface = el,
-    dir,
-    swipeType,
-    startX,
-    startY,
-    distX,
-    distY,
-    threshold = 150, //required min distance traveled to be considered swipe
-    restraint = 100, // maximum distance allowed at the same time in perpendicular direction
-    allowedTime = 500, // maximum time allowed to travel that distance
-    elapsedTime,
-    startTime,
-    handletouch = callback || function(evt, dir, phase, swipetype, distance) {};
-
-  touchsurface.addEventListener(
-    'touchstart',
-    function(e) {
-      var touchobj = e.changedTouches[0];
-      dir = 'none';
-      swipeType = 'none';
-      dist = 0;
-      startX = touchobj.pageX;
-      startY = touchobj.pageY;
-      startTime = new Date().getTime(); // record time when finger first makes contact with surface
-      handletouch(e, 'none', 'start', swipeType, 0); // fire callback function with params dir="none", phase="start", swipetype="none" etc
-      e.preventDefault();
-    },
-    false
-  );
-
-  touchsurface.addEventListener(
-    'touchmove',
-    function(e) {
-      var touchobj = e.changedTouches[0];
-      distX = touchobj.pageX - startX; // get horizontal dist traveled by finger while in contact with surface
-      distY = touchobj.pageY - startY; // get vertical dist traveled by finger while in contact with surface
-      if (Math.abs(distX) > Math.abs(distY)) {
-        // if distance traveled horizontally is greater than vertically, consider this a horizontal movement
-        dir = distX < 0 ? 'left' : 'right';
-        handletouch(e, dir, 'move', swipeType, distX); // fire callback function with params dir="left|right", phase="move", swipetype="none" etc
-      } else {
-        // else consider this a vertical movement
-        dir = distY < 0 ? 'up' : 'down';
-        handletouch(e, dir, 'move', swipeType, distY); // fire callback function with params dir="up|down", phase="move", swipetype="none" etc
-      }
-      e.preventDefault(); // prevent scrolling when inside DIV
-    },
-    false
-  );
-
-  touchsurface.addEventListener(
-    'touchend',
-    function(e) {
-      var touchobj = e.changedTouches[0];
-      elapsedTime = new Date().getTime() - startTime; // get time elapsed
-      if (elapsedTime <= allowedTime) {
-        // first condition for awipe met
-        if (Math.abs(distX) >= threshold && Math.abs(distY) <= restraint) {
-          // 2nd condition for horizontal swipe met
-          swipeType = dir; // set swipeType to either "left" or "right"
-        } else if (
-          Math.abs(distY) >= threshold &&
-          Math.abs(distX) <= restraint
-        ) {
-          // 2nd condition for vertical swipe met
-          swipeType = dir; // set swipeType to either "top" or "down"
-        }
-      }
-      // Fire callback function with params dir="left|right|up|down", phase="end", swipetype=dir etc:
-      handletouch(
-        e,
-        dir,
-        'end',
-        swipeType,
-        dir == 'left' || dir == 'right' ? distX : distY
-      );
-      e.preventDefault();
-    },
-    false
-  );
 }
