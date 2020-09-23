@@ -9,8 +9,8 @@ npm install -S fullpage-swiper
 ## Check examples
 ```bash
 git clone https://github.com/catalsrun/fullpage-swiper.git
-cd fullpage-swiper
-cd examples
+npm install
+cd fullpage-swiper/examples
 npm install
 npm start
 # Go to http://localhost:3000
