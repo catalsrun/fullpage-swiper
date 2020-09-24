@@ -48,10 +48,8 @@ export default class FullpageSwiper {
     this.hammers = [];
 
     this.currentIdx = 0;
-    this.eventType = {
-      axis: '',
-      direction: ''
-    };
+    this.eventAxis = '';
+    this.eventDirection = '';
     this.dragging = false;
     this.draggingRef = null;
 
@@ -68,41 +66,35 @@ export default class FullpageSwiper {
     this.options.debug && this.debug();
   }
   removeListeners() {}
-  _blockEvent(eventType) {
+  _blockEvent(eventAxis) {
     // 최초 이벤트 요청일 경우 블록 X
-    if (this.eventType.axis === '') {
-      this._updateEventType(eventType);
+    if (this.eventAxis === '') {
+      this.eventAxis = eventAxis;
       return false;
     }
     // 1.드래깅중이 아닐 경우 이벤트 블록
     // 2. 진행중인 드래깅이 존재하는 경우, 요청 이벤트 타입이 동일하지 않으면 블록
-    if (!this.isDragging || this.eventType.axis !== eventType.axis) {
+    if (!this.isDragging || this.eventAxis !== eventAxis) {
       // console.log('blocked event', eventType);
       return true;
     }
 
     // 동일한 axis의 드래깅중인 경우 업데이트
-    this._updateEventType(eventType);
-  }
-  _updateEventType(eventType) {
-    this.eventType.axis = eventType.axis;
-    this.eventType.direction = eventType.direction;
+    this.eventAxis = eventAxis;
   }
   _resetDrag() {
     this.dragging = false;
-    this.eventType = {
-      target: null,
-      axis: '',
-      direction: ''
-    };
+    this.eventAxis = '';
+    this.eventDirection = '';
     this.draggingRef = null;
+    this.stackMoveFromTo = {};
   }
   _getDraggingInfo(eventTarget) {
     if (eventTarget) {
       // obj { from, to, draggable }
-      let obj = eventTarget.canMoveToSibling[this.eventType.direction];
+      let obj = eventTarget.canMoveToSibling[this.eventDirection];
       if (!obj) {
-        obj = eventTarget.canMoveToParent[this.eventType.direction];
+        obj = eventTarget.canMoveToParent[this.eventDirection];
       }
       return obj; 
     }
@@ -120,11 +112,11 @@ export default class FullpageSwiper {
     this.options.dragStart(this);
   }
   _panleft(e) {
-    const eventType = {
-      axis: 'horizontal',
-      direction: 'left'
-    };
-    if (this._blockEvent(eventType)) return;
+    const eventAxis = 'horizontal';
+    if (this._blockEvent(eventAxis)) return;
+    this.isDifferentEvent = this.eventDirection && this.eventDirection !== 'left';
+
+    this.eventDirection = 'left';
     // console.log('START:', eventType.direction);
     
     if (!this.draggingRef) {
@@ -135,15 +127,15 @@ export default class FullpageSwiper {
     if (!this.draggingRef) {
       this._resetDrag();
     } else {
-      this._dragging(this.draggingInfo, e);
+      this._dragging(e);
     }
   }
   _panright(e) {
-    const eventType = {
-      axis: 'horizontal',
-      direction: 'right'
-    };
-    if (this._blockEvent(eventType)) return;
+    const eventAxis = 'horizontal';
+    if (this._blockEvent(eventAxis)) return;
+    this.isDifferentEvent = this.eventDirection && this.eventDirection !== 'right';
+
+    this.eventDirection = 'right';
     // console.log('START:', eventType.direction);
     if (!this.draggingRef) {
       this.draggingInfo = this._getDraggingInfo(this.eventTarget);
@@ -153,15 +145,15 @@ export default class FullpageSwiper {
     if (!this.draggingRef) {
       this._resetDrag();
     } else {
-      this._dragging(this.draggingInfo, e);
+      this._dragging(e);
     }
   }
   _pandown(e) {
-    const eventType = {
-      axis: 'vertical',
-      direction: 'down'
-    };
-    if (this._blockEvent(eventType)) return;
+    const eventAxis = 'vertical';
+    if (this._blockEvent(eventAxis)) return;
+    this.isDifferentEvent = this.eventDirection && this.eventDirection !== 'down';
+
+    this.eventDirection = 'down';
     // console.log('START:', eventType.direction, this.draggingRef);
     if (!this.draggingRef) {
       this.draggingInfo = this._getDraggingInfo(this.eventTarget);
@@ -171,16 +163,15 @@ export default class FullpageSwiper {
     if (!this.draggingRef) {
       this._resetDrag();
     } else {
-      this._dragging(this.draggingInfo, e);
+      this._dragging(e);
     }
   }
   
   _panup(e) {
-    const eventType = {
-      axis: 'vertical',
-      direction: 'up'
-    };
-    if (this._blockEvent(eventType)) return;
+    const eventAxis = 'vertical';
+    if (this._blockEvent(eventAxis)) return;
+    this.isDifferentEvent = this.eventDirection && this.eventDirection !== 'up';
+    this.eventDirection = 'up';
     // console.log('from to', data.from, data.to);
 
     if (!this.draggingRef) {
@@ -191,23 +182,17 @@ export default class FullpageSwiper {
     if (!this.draggingRef) {
       this._resetDrag();
     } else {
-      this._dragging(this.draggingInfo, e);
+      this._dragging(e);
     }
   }
   _endCallback() {
     const { stackMoveFromTo } = this;
-    let updateTo = stackMoveFromTo.to;
-    if (stackMoveFromTo.toParent) {
-      if (updateTo >= 0) {
-        stackMoveFromTo.toParent.lastSeenIndex = updateTo;
-      } else {
-        // Restore
-        stackMoveFromTo.toParent.lastSeenIndex = this.currentIdx;
-        stackMoveFromTo.to = this.currentIdx;
+    if (stackMoveFromTo.from !== stackMoveFromTo.to) {
+      if (stackMoveFromTo.toParent) {
+        stackMoveFromTo.toParent.lastSeenIndex = stackMoveFromTo.to;
       }
     }
     this.currentIdx = stackMoveFromTo.to;
-    
     this.options.dragEnd(this);
     this._resetDrag();
   }
@@ -217,16 +202,15 @@ export default class FullpageSwiper {
       // gsap 콜백내에서 this.draggingRef 의 값이 null 이 될 가능성이 존재하므로
       // 드래깅되는 객체의 주소지를 변수로 저장해서 사용
       const draggingRef = this.draggingRef;
-      const eventType = this.eventType;
+      const direction = this.eventDirection;
       const { type } = draggingRef;
-      const { direction } = eventType;
       const { clientHeight, clientWidth } = this.viewport;
       const t = this.dep.gsap.timeline();
 
       if (type === 'top') {
         if (direction === 'up') {
-          if (this.eventTarget.node !== draggingRef.node) {
-            this.stackMoveFromTo.to = this.currentIdx;
+          if (draggingRef.positions.top !== 0) {
+            this.stackMoveFromTo.to = this.stackMoveFromTo.from;
           }
           t.to(draggingRef.node, { top: -clientHeight }).add(() => {
             draggingRef.positions.top = -clientHeight;
@@ -234,8 +218,8 @@ export default class FullpageSwiper {
           });
         }
         if (direction === 'down') {
-          if (this.eventTarget.node === draggingRef.node) {
-            this.stackMoveFromTo.to = this.currentIdx;
+          if (draggingRef.positions.top === 0) {
+            this.stackMoveFromTo.to = this.stackMoveFromTo.from;
           }
           t.to(draggingRef.node, { top: 0 }).add(() => {
             draggingRef.positions.top = 0;
@@ -244,13 +228,20 @@ export default class FullpageSwiper {
         }
       }
       if (type === 'left') {
-        if (this.eventType.direction === 'left') {
+        if (direction === 'left') {
+          if (draggingRef.positions.left !== 0) {
+            this.stackMoveFromTo.to = this.stackMoveFromTo.from;
+          }
+
           t.to(draggingRef.node, { left: -clientWidth }).add(() => {
             draggingRef.positions.left = -clientWidth;
             this._endCallback();
           });
         }
-        if (this.eventType.direction === 'right') {
+        if (direction === 'right') {
+          if (draggingRef.positions.left === 0) {
+            this.stackMoveFromTo.to = this.stackMoveFromTo.from;
+          }
           t.to(draggingRef.node, { left: 0 }).add(() => {
             draggingRef.positions.left = 0;
             this._endCallback();
@@ -259,6 +250,7 @@ export default class FullpageSwiper {
       }
 
       if (type === 'y') {
+        const gap = draggingRef.positions.y - this.snapshotPositions.y;
         const y = draggingRef.positions.y;
         if (direction === 'up') {
           const canNext = this.snapshotPositions.y < y;
@@ -267,9 +259,12 @@ export default class FullpageSwiper {
             move = y - clientHeight;
             const max = -clientHeight * (draggingRef.children.length - 1);
             if (move < max) move = max;
-          } else {
-            this.stackMoveFromTo.to = this.currentIdx;
           }
+
+          if (gap < 0) {
+            this.stackMoveFromTo.to = this.stackMoveFromTo.from;
+          }
+
           t.to(draggingRef.node, { y: move }).add(() => {
             draggingRef.positions.y = move;
             this._endCallback();
@@ -281,10 +276,10 @@ export default class FullpageSwiper {
           if (canNext) {
             move = y + clientHeight;
             if (move >= 0) move = 0;
-          } else {
-            this.stackMoveFromTo.to = this.currentIdx;
           }
-
+          if (gap > 0) {
+            this.stackMoveFromTo.to = this.stackMoveFromTo.from;
+          }
           t.to(draggingRef.node, { y: move }).add(() => {
             draggingRef.positions.y = move;
             this._endCallback();
@@ -303,7 +298,7 @@ export default class FullpageSwiper {
             const max = -clientWidth * (draggingRef.children.length - 1);
             if (move < max) move = max;
           } else {
-            this.stackMoveFromTo.to = this.currentIdx;
+            this.stackMoveFromTo.to = this.stackMoveFromTo.from;
           }
           t.to(draggingRef.node, { x: move }).add(() => {
             draggingRef.positions.x = move;
@@ -317,7 +312,7 @@ export default class FullpageSwiper {
             move = x + clientWidth;
             if (move >= 0) move = 0;
           } else {
-            this.stackMoveFromTo.to = this.currentIdx;
+            this.stackMoveFromTo.to = this.stackMoveFromTo.from;
           }
           t.to(draggingRef.node, { x: move }).add(() => {
             draggingRef.positions.x = move;
@@ -331,7 +326,7 @@ export default class FullpageSwiper {
   }
   // this.distance 값에 따라 드래그 가동범위 셋팅 가능하도록
   // Math.abs(e.deltaY), Math.abs(e.deltaX)
-  _dragging({ from, to, changeableTo }, e) {
+  _dragging(e) {
     const target = this.draggingRef;
     const { type } = target;
     const { clientHeight, clientWidth } = this.viewport;
@@ -344,26 +339,31 @@ export default class FullpageSwiper {
     };
     const positions = this.snapshotPositions;
     let posY, posX;
-    const stackView = this.stacks.find(el => el.node === this.eventTarget.node);
+
+   
+
     if (type === 'y') {
       posY = e.deltaY + target.positions.y;
+
       if (posY >= 0) {
         target.positions.y = 0;
         target.node.style.transform = 'translate3d(0px, 0px, 0px)';
+        // console.log('this.isDifferentEvent2', this.isDifferentEvent);
         // change dragging target
-        this.draggingInfo = this._getDraggingInfo(stackView);
+        this.draggingInfo = this._getDraggingInfo(this.eventTarget);
         this.draggingRef = this.draggingInfo.draggable;
         return;
-      }
-
-      const max = -clientHeight * (target.children.length - 1);
-      if (posY <= max) {
-        target.positions.y = max;
-        target.node.style.transform = `translate3d(0px, ${max}px, 0px)`;
-        // change dragging target
-        const draggingInfo = this._getDraggingInfo(stackView);
-        this.draggingRef = draggingInfo.draggable;
-        return;
+      } else {
+        // 경계면 이동시 버그?
+        const max = -clientHeight * (target.children.length - 1);
+        if (posY <= max) {
+          target.positions.y = max;
+          target.node.style.transform = `translate3d(0px, ${max}px, 0px)`;
+          // change dragging target
+          this.draggingInfo = this._getDraggingInfo(this.eventTarget);
+          this.draggingRef = this.draggingInfo.draggable;
+          return;
+        }
       }
 
       // 실제 그려짐
@@ -376,7 +376,7 @@ export default class FullpageSwiper {
         target.positions.x = 0;
         target.node.style.transform = 'translate3d(0px, 0px, 0px)';
         // change dragging target
-        this.draggingInfo = this._getDraggingInfo(stackView);
+        this.draggingInfo = this._getDraggingInfo(this.eventTarget);
         this.draggingRef = this.draggingInfo.draggable;
         return;
       }
@@ -385,7 +385,7 @@ export default class FullpageSwiper {
         target.positions.x = max;
         target.node.style.transform = `translate3d(${max}px, 0px, 0px)`;
         // change dragging target
-        this.draggingInfo = this._getDraggingInfo(stackView);
+        this.draggingInfo = this._getDraggingInfo(this.eventTarget);
         this.draggingRef = this.draggingInfo.draggable;
         return;
       }
@@ -398,7 +398,7 @@ export default class FullpageSwiper {
         target.positions.top = 0;
         target.node.style.top = 0 + 'px';
         // change dragging target
-        this.draggingInfo = this._getDraggingInfo(stackView);
+        this.draggingInfo = this._getDraggingInfo(this.eventTarget);
         this.draggingRef = this.draggingInfo.draggable;
         return;
       }
@@ -406,7 +406,7 @@ export default class FullpageSwiper {
         target.positions.top = -clientHeight;
         target.node.style.top = -clientHeight + 'px';
         // change dragging target
-        this.draggingInfo = this._getDraggingInfo(stackView);
+        this.draggingInfo = this._getDraggingInfo(this.eventTarget);
         this.draggingRef = this.draggingInfo.draggable;
         return;
       }
@@ -421,7 +421,7 @@ export default class FullpageSwiper {
         target.positions.left = 0;
         target.node.style.left = 0 + 'px';
         // change dragging target
-        this.draggingInfo = this._getDraggingInfo(stackView);
+        this.draggingInfo = this._getDraggingInfo(this.eventTarget);
         this.draggingRef = this.draggingInfo.draggable;
         return;
       }
@@ -429,7 +429,7 @@ export default class FullpageSwiper {
         target.positions.left = -clientWidth;
         target.node.style.left = -clientWidth + 'px';
         // change dragging target
-        this.draggingInfo = this._getDraggingInfo(stackView);
+        this.draggingInfo = this._getDraggingInfo(this.eventTarget);
         this.draggingRef = this.draggingInfo.draggable;
         return;
       }
@@ -438,13 +438,21 @@ export default class FullpageSwiper {
       this.dep.gsap.set(target.node, { left: posX });
     }
 
-    this.stackMoveFromTo = this._getStackMoveFromTo(from, to, changeableTo);
+    // console.log('_dragging', type, this.eventDirection, posY, this.eventTarget, this.draggingInfo);
+
+     
+    if (this.isDifferentEvent) {
+      const draggingInfo = this._getDraggingInfo(this.eventTarget);
+      if (draggingInfo) this.draggingInfo = draggingInfo;
+    }
+    this.stackMoveFromTo = this._getStackMoveFromTo();
     this.options.dragMove(this);
     // top 의 경우시
     // siblingIndex 0, posY 0, -1, -2, ... -> end Event 시 -667
     // siblingIndex 0 값은 점점 hide, sliblingindex 1값은 하단 부터 점점 노출
   }
-  _getStackMoveFromTo(from, to, changeableTo) {
+  _getStackMoveFromTo() {
+    const { from, to, changeableTo } = this.draggingInfo;
     const result = {
       from,
     };
@@ -457,6 +465,8 @@ export default class FullpageSwiper {
       result.to = toParent.lastSeenIndex ? toParent.lastSeenIndex : changeableTo;
       result.toParent = toParent;
     }
+    // console.log('from', from, to, changeableTo, result);
+
     return result;
   }
 
@@ -659,21 +669,19 @@ export default class FullpageSwiper {
         type,
         axis: direction,
         node, // for e.target
-        siblingIndex,
         innerParent,
         innerParentIndex,
-        isRootLevel: innerParent.isRoot,
         isRootLevelStack: innerParent.isRoot,
         children: innerParent.children,
         isFirstNode: siblingIndex === 0,
         isLastNode: siblingIndex === innerParent.children.length - 1,
-        requestEvents: {},
         positions: {
           x: 0,
           y: 0,
           top: 0,
           left: 0
-        }
+        },
+        siblingIndex,
       };
       innerParent.children[siblingIndex] = stackView;
 
@@ -699,9 +707,8 @@ export default class FullpageSwiper {
       }
     }
 
-    this.stacks.forEach((item, _, arr) => {
+    this.stacks.forEach((item) => {
       item.canMoveToParent = this._canMoveToParent(item);
-      item.nextStackView = this._setPrevNextTarget(item, arr);
     });
   }
   _canMoveToParent(stack) {
@@ -851,349 +858,6 @@ export default class FullpageSwiper {
     return result;
   }
  
-  // 결정론적 - stack 의 타입에 따라 이미 draggable element 를 결정
-  // issue : index 3 일때 up 이 셋팅되지 않음
-  _setPrevNextTarget(stackView) {
-    // console.log('_setPrevNextTarget stackIndex', stackView);
-    if (stackView.stackIndex === 3) {
-      // debugger;
-    }
-    const {
-      stackIndex,
-      siblingIndex,
-      type,
-      axis,
-      isRootLevel,
-      isFirstNode,
-      isLastNode,
-      innerParent,
-      children
-    } = stackView;
-    const targetToDrag = {
-      up: false,
-      down: false,
-      left: false,
-      right: false
-    };
-    stackView.results = {
-      up: null,
-      down: null,
-      left: null,
-      right: null
-    };
-
-    if (isRootLevel) {
-      // Request event type : panup or pandown
-      // TransformY 값 변경시
-      if (type === 'y') {
-        if (!isLastNode) {
-          targetToDrag.up = innerParent;
-        }
-        if (!isFirstNode) {
-          targetToDrag.down = innerParent;
-        }
-      }
-
-      if (type === 'x') {
-        if (!isLastNode) {
-          targetToDrag.left = innerParent;
-        }
-        if (!isFirstNode) {
-          targetToDrag.right = innerParent;
-        }
-      }
-
-      // top 값 변경시
-      if (type === 'top') {
-        if (!isLastNode) {
-          targetToDrag.up = children[siblingIndex];
-        }
-        if (!isFirstNode) {
-          targetToDrag.down = children[siblingIndex - 1];
-        }
-      }
-
-      // left 값 변경시
-      if (type === 'left') {
-        if (!isLastNode) {
-          targetToDrag.left = children[siblingIndex];
-        }
-        if (!isFirstNode) {
-          targetToDrag.right = children[siblingIndex - 1];
-        }
-      }
-    } else {
-      // **Root level 스택뷰가 아닌 경우**
-      const outerParent = innerParent.outerParent;
-
-      if (axis === 'vertical') {
-        // todo - results
-        // **경계면 이동시 처리**
-        if (!outerParent.isLastNode) {
-          if (outerParent.type === 'left') {
-            targetToDrag.left = outerParent.children[outerParent.siblingIndex];
-          }
-          if (outerParent.type === 'x') {
-            targetToDrag.left = outerParent.innerParent;
-          }
-        }
-
-        // todo - results
-        // **경계면 이동시 처리**
-        if (!outerParent.isFirstNode) {
-          if (outerParent.type === 'left') {
-            targetToDrag.right =
-              outerParent.children[outerParent.siblingIndex - 1];
-          }
-          if (outerParent.type === 'x') {
-            targetToDrag.right = outerParent.innerParent;
-          }
-        }
-      }
-
-      if (type === 'y') {
-        // Request event
-        // axis === 'vertical' && type === 'y'
-        if (!isLastNode) {
-          // 형제간 이동시 - 형제 노드들중 마지막 노드가 아닌 경우
-          targetToDrag.up = innerParent;
-          // targetToDrag.result.up = [fromIndex, toIndex]
-          stackView.results.up = {
-            type,
-            from: stackIndex,
-            to: stackIndex + 1
-          };
-        } else {
-          // **경계면 이동시 처리**
-          // 마지막 노드인 경우
-          // axis === 'vertical' && type === 'y'
-          if (!outerParent.isLastNode) {
-            if (outerParent.type === 'top') {
-              targetToDrag.up = outerParent.children[outerParent.siblingIndex];
-            }
-            if (outerParent.type === 'y') {
-              targetToDrag.up = outerParent.innerParent;
-            }
-          }
-        }
-
-        // axis === 'vertical' && type === 'y'
-        if (!isFirstNode) {
-          // 형제간 이동시 - 형제 노드들중 첫번째 노드가 아닌 경우
-          targetToDrag.down = innerParent;
-          // targetToDrag.result.down = [fromIndex, toIndex]
-          stackView.results.down = {
-            type,
-            from: stackIndex,
-            to: stackIndex - 1
-          };
-        } else {
-          // **경계면 이동시 처리**
-          // 첫번째 노드인 경우
-          // axis === 'vertical' && type === 'y'
-          // 최상위 엘리먼트가 첫번째 노드가 아닌 경우
-          if (!outerParent.isFirstNode) {
-            if (outerParent.type === 'top') {
-              targetToDrag.down =
-                outerParent.children[outerParent.siblingIndex - 1];
-            }
-            if (outerParent.type === 'y') {
-              targetToDrag.down = outerParent.innerParent;
-            }
-          }
-        }
-      }
-      if (type === 'top') {
-        // Request event
-        // axis === 'vertical' && type === 'top'
-        if (!isLastNode) {
-          // 형제간 이동시 - 형제 노드들 중 마지막 노드가 아닌 경우
-          // up 이벤트 발생할 경우 top 값을 -clientHeight 만큼 변경 시킴
-          targetToDrag.up = children[siblingIndex];
-
-          // 핵심!
-          // targetToDrag.result.up = [fromIndex, toIndex]
-          stackView.results.up = {
-            type,
-            from: stackIndex,
-            to: stackIndex + 1
-          };
-        } else {
-          // 형제 노드들중 마지막 노드인 경우
-          // axis === 'vertical' && type === 'top'
-          // 경계면 이동시 처리
-          if (!outerParent.isLastNode) {
-            if (outerParent.type === 'top') {
-              targetToDrag.up = outerParent.children[outerParent.siblingIndex];
-            }
-            if (outerParent.type === 'y') {
-              targetToDrag.up = outerParent.innerParent;
-            }
-          }
-        }
-
-        if (!isFirstNode) {
-          // 형제간 이동시 - 형제 노드들 중 첫 노드가 아닌 경우
-          // down 이벤트 발생할 경우 현재 stackView의 -1 전 형제 노드의 top값을 0으로 변경
-          targetToDrag.down = children[siblingIndex - 1];
-          // targetToDrag.result.down = [fromIndex, toIndex]
-
-          stackView.results.down = {
-            type,
-            from: stackIndex,
-            to: stackIndex - 1
-          };
-        } else {
-          // **경계면 이동시 처리**
-          // 형제 노드들 중 첫 노드인 경우
-          // StackView axis === 'vertical' && type === 'top'
-          if (!outerParent.isFirstNode) {
-            if (outerParent.type === 'top') {
-              targetToDrag.down =
-                outerParent.children[outerParent.siblingIndex - 1];
-            }
-            if (outerParent.type === 'y') {
-              targetToDrag.down = outerParent.innerParent;
-            }
-          }
-        }
-      }
-
-      if (axis === 'horizontal') {
-        // **경계면 이동시 처리**
-        // StackView axis === 'horizontal'
-        if (outerParent.type === 'top') {
-          // 최상위 엘리먼트가 마지막 노드가 아닌 경우
-          if (!outerParent.isLastNode) {
-            targetToDrag.up = outerParent.children[outerParent.siblingIndex];
-          }
-          // 최상위 엘리먼트가 첫번째 노드가 아닌 경우
-          if (!outerParent.isFirstNode) {
-            targetToDrag.down =
-              outerParent.children[outerParent.siblingIndex - 1];
-          }
-        }
-        // **경계면 이동시 처리**
-        if (outerParent.type === 'y') {
-          targetToDrag.up = outerParent.innerParent;
-          targetToDrag.down = outerParent.innerParent;
-        }
-      }
-
-      if (type === 'x') {
-        // Request event
-        // StackView axis === 'horizontal'
-        // Stack type === 'x'
-        if (!isLastNode) {
-          // 형제간 이동시 - 형제 노드들 중 마지막 노드가 아닌 경우
-          targetToDrag.left = innerParent;
-          // 핵심!
-          // targetToDrag.result.up = [fromIndex, toIndex]
-          stackView.results.left = {
-            type,
-            from: stackIndex,
-            to: stackIndex + 1
-          };
-        } else {
-          // **경계면 이동시 처리**
-          // 형제 노드들 중 마지막 노드인 경우
-          // StackView axis === 'horizontal'
-          if (!outerParent.isLastNode) {
-            if (outerParent.type === 'left') {
-              targetToDrag.left =
-                outerParent.children[outerParent.siblingIndex];
-            }
-            if (outerParent.type === 'x') {
-              targetToDrag.left = outerParent.innerParent;
-            }
-          }
-        }
-
-        // Request event
-        // StackView axis === 'horizontal'
-        // Stack type === 'x'
-        if (!isFirstNode) {
-          // 형제간 이동시 - 형제 노드들 중 첫번째 노드가 아닌 경우
-          targetToDrag.right = innerParent;
-          stackView.results.right = {
-            type,
-            from: stackIndex,
-            to: stackIndex - 1
-          };
-        } else {
-          // **경계면 이동시 처리**
-          // 형제 노드들 중 첫번째 노드인 경우
-          // StackView axis === 'horizontal'
-          if (!outerParent.isFirstNode) {
-            if (outerParent.type === 'left') {
-              targetToDrag.right =
-                outerParent.children[outerParent.siblingIndex - 1];
-            }
-            if (outerParent.type === 'x') {
-              targetToDrag.right = outerParent.innerParent;
-            }
-          }
-        }
-      }
-
-      if (type === 'left') {
-        // Request event
-        // StackView axis === 'horizontal'
-        // Stack type === 'left'
-        if (!isLastNode) {
-          // 형제간 이동시 - 형제 노드들 중 마지막 노드가 아닌 경우
-          targetToDrag.left = children[siblingIndex];
-          stackView.results.left = {
-            type,
-            from: stackIndex,
-            to: stackIndex + 1
-          };
-        } else {
-          // **경계면 이동시 처리**
-          // 형제 노드들 중 마지막 노드인 경우
-          // StackView axis === 'horizontal'
-          // Stack type === 'left'
-          if (!outerParent.isLastNode) {
-            if (outerParent.type === 'left') {
-              targetToDrag.left =
-                outerParent.children[outerParent.siblingIndex];
-            }
-            if (outerParent.type === 'x') {
-              targetToDrag.left = outerParent.innerParent;
-            }
-          }
-        }
-
-        // Request event
-        // StackView axis === 'horizontal'
-        // Stack type === 'left'
-        if (!isFirstNode) {
-          // 형제간 이동시 - 형제 노드들 중 첫번째 노드가 아닌 경우
-          targetToDrag.right = children[siblingIndex - 1];
-          stackView.results.right = {
-            type,
-            from: stackIndex,
-            to: stackIndex - 1
-          };
-        } else {
-          // **경계면 이동시 처리**
-          // 형제 노드들 중 첫번째 노드인 경우
-          // StackView axis === 'horizontal'
-          // Stack type === 'left'
-          if (!outerParent.isFirstNode) {
-            if (outerParent.type === 'left') {
-              targetToDrag.right =
-                outerParent.children[outerParent.siblingIndex - 1];
-            }
-            if (outerParent.type === 'x') {
-              targetToDrag.right = outerParent.innerParent;
-            }
-          }
-        }
-      }
-    }
-    return targetToDrag;
-  }
   debug() {
     this.stacks.forEach(el => {
       const color = FullpageSwiper.getRandomColor();
