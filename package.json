@@ -5,6 +5,7 @@
   "main": "dist/fullpage-swiper.min.js",
   "scripts": {
     "build": "webpack",
+    "build:examples": "cd examples && npm run build",
     "release": "np"
   },
   "np": {
