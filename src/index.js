@@ -61,6 +61,7 @@ export default class FullpageSwiper {
     this.setLayout();
 
     this.resizeCallback = this._resizeCallback.bind(this);
+    // this.rotationCallback = this._rotationCallback.bind(this);
     this._addEvents();
     this.options.debug && this.debug();
   }
@@ -195,6 +196,8 @@ export default class FullpageSwiper {
     }
     this.currentIdx = stackMoveFromTo.to;
     this.options.dragEnd(this);
+    
+    this.resizeCallback();
     this._resetDrag();
   }
   _panend() {
@@ -517,12 +520,34 @@ export default class FullpageSwiper {
     mc.on('panup', this._panup.bind(this));
 
     window.addEventListener('resize', this.resizeCallback);
+    // required - kakaotalk webview
+    window.addEventListener('orientationchange', this.resizeCallback);
   }
+  // _rotationCallback(e) {
+  //   if (window.orientation === 0) {
+  //     this.timer && clearInterval(this.timer);
+  //     let max = 0;
+  //     this.timer = setInterval(() => {
+  //       const viewport = FullpageSwiper.getViewport();
+  //       if (this.viewport.clientHeight !== viewport.clientHeight) {
+  //         this.timer && clearInterval(this.timer);
+  //         this.timer = null;
+  //         this._resizeCallback();
+  //       } else {
+  //         if (max >= 10) {
+  //           this.timer && clearInterval(this.timer);
+  //           this.timer = null;
+  //           this._resizeCallback();
+  //         }
+  //         max++;
+  //       }
+  //     }, 60);
+  //   }
+  // }
   _resizeCallback() {
-    console.log(1);
     this.setCommonLayout();
     this.setLayout();
-      // Positions update
+        // Positions update
     const root = this.parents[0];
     this._updatePositions(root);
     root.children.forEach((child) => {
@@ -532,6 +557,7 @@ export default class FullpageSwiper {
       this._updatePositions(s);
       this._updatePositions(s.innerParent);
     });
+    
   }
   _updatePositions({ positions, node }) {
     const { clientHeight, clientWidth } = this.viewport;
@@ -554,6 +580,7 @@ export default class FullpageSwiper {
     }
   }
   setCommonLayout() {
+    this.viewport = FullpageSwiper.getViewport();
     // Block x,y scrolling
     // Required in Samsung Internet browser
     document.documentElement.style.overflow = 'hidden';
@@ -565,7 +592,6 @@ export default class FullpageSwiper {
     document.body.style.width = '100%';
   }
   setLayout() {
-    this.viewport = FullpageSwiper.getViewport();
     // 부모 컨테이너 layout
     this.parents.forEach(parent => {
       // data-stack-type 에 따라 layout setting
