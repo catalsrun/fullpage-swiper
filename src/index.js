@@ -60,8 +60,9 @@ export default class FullpageSwiper {
     this.setCommonLayout();
     this.setLayout();
 
-    // const config = this.options.parentsConfig[parent.id] || {}
     this._addEvents();
+
+    this.resizeCallback = this._resizeCallback.bind(this);
 
     this.options.debug && this.debug();
   }
@@ -197,7 +198,6 @@ export default class FullpageSwiper {
     this._resetDrag();
   }
   _panend() {
-    // console.log('START: panend', this.eventType, !!this.draggingRef);
     if (this.draggingRef) {
       // gsap 콜백내에서 this.draggingRef 의 값이 null 이 될 가능성이 존재하므로
       // 드래깅되는 객체의 주소지를 변수로 저장해서 사용
@@ -205,7 +205,7 @@ export default class FullpageSwiper {
       const direction = this.eventDirection;
       const { type } = draggingRef;
       const { clientHeight, clientWidth } = this.viewport;
-      const t = this.dep.gsap.timeline();
+      const t = gsap.timeline();
 
       if (type === 'top') {
         if (direction === 'up') {
@@ -214,6 +214,7 @@ export default class FullpageSwiper {
           }
           t.to(draggingRef.node, { top: -clientHeight }).add(() => {
             draggingRef.positions.top = -clientHeight;
+            draggingRef.positions.topResize = -1;
             this._endCallback();
           });
         }
@@ -223,6 +224,7 @@ export default class FullpageSwiper {
           }
           t.to(draggingRef.node, { top: 0 }).add(() => {
             draggingRef.positions.top = 0;
+            delete draggingRef.positions.topResize;
             this._endCallback();
           });
         }
@@ -235,6 +237,7 @@ export default class FullpageSwiper {
 
           t.to(draggingRef.node, { left: -clientWidth }).add(() => {
             draggingRef.positions.left = -clientWidth;
+            draggingRef.positions.leftResize = -1;
             this._endCallback();
           });
         }
@@ -244,6 +247,7 @@ export default class FullpageSwiper {
           }
           t.to(draggingRef.node, { left: 0 }).add(() => {
             draggingRef.positions.left = 0;
+            delete draggingRef.positions.leftResize;
             this._endCallback();
           });
         }
@@ -267,6 +271,11 @@ export default class FullpageSwiper {
 
           t.to(draggingRef.node, { y: move }).add(() => {
             draggingRef.positions.y = move;
+            if (move !== 0) {
+              draggingRef.positions.yResize = move/clientHeight;
+            } else {
+              delete draggingRef.positions.yResize;
+            }
             this._endCallback();
           });
         }
@@ -282,6 +291,11 @@ export default class FullpageSwiper {
           }
           t.to(draggingRef.node, { y: move }).add(() => {
             draggingRef.positions.y = move;
+            if (move !== 0) {
+              draggingRef.positions.yResize = move/clientHeight;
+            } else {
+              delete draggingRef.positions.yResize;
+            }
             this._endCallback();
           });
         }
@@ -302,6 +316,11 @@ export default class FullpageSwiper {
           }
           t.to(draggingRef.node, { x: move }).add(() => {
             draggingRef.positions.x = move;
+            if (move !== 0) {
+              draggingRef.positions.xResize = move/clientWidth;
+            } else {
+              delete draggingRef.positions.xResize;
+            }
             this._endCallback();
           });
         }
@@ -316,6 +335,11 @@ export default class FullpageSwiper {
           }
           t.to(draggingRef.node, { x: move }).add(() => {
             draggingRef.positions.x = move;
+            if (move !== 0) {
+              draggingRef.positions.xResize = move/clientWidth;
+            } else {
+              delete draggingRef.positions.xResize;
+            }
             this._endCallback();
           });
         }
@@ -324,6 +348,7 @@ export default class FullpageSwiper {
       this._resetDrag();
     }
   }
+  // todo
   // this.distance 값에 따라 드래그 가동범위 셋팅 가능하도록
   // Math.abs(e.deltaY), Math.abs(e.deltaX)
   _dragging(e) {
@@ -339,22 +364,17 @@ export default class FullpageSwiper {
     };
     const positions = this.snapshotPositions;
     let posY, posX;
-
-   
-
     if (type === 'y') {
       posY = e.deltaY + target.positions.y;
 
       if (posY >= 0) {
         target.positions.y = 0;
         target.node.style.transform = 'translate3d(0px, 0px, 0px)';
-        // console.log('this.isDifferentEvent2', this.isDifferentEvent);
         // change dragging target
         this.draggingInfo = this._getDraggingInfo(this.eventTarget);
         this.draggingRef = this.draggingInfo.draggable;
         return;
       } else {
-        // 경계면 이동시 버그?
         const max = -clientHeight * (target.children.length - 1);
         if (posY <= max) {
           target.positions.y = max;
@@ -366,9 +386,8 @@ export default class FullpageSwiper {
         }
       }
 
-      // 실제 그려짐
       positions.y = posY;
-      this.dep.gsap.set(target.node, { y: posY });
+      gsap.set(target.node, { y: posY });
     }
     if (type === 'x') {
       posX = e.deltaX + target.positions.x;
@@ -390,7 +409,7 @@ export default class FullpageSwiper {
         return;
       }
       positions.x = posX;
-      this.dep.gsap.set(target.node, { x: posX });
+      gsap.set(target.node, { x: posX });
     }
     if (type === 'top') {
       posY = e.deltaY + target.positions.top;
@@ -412,7 +431,7 @@ export default class FullpageSwiper {
       }
 
       positions.top = posY;
-      this.dep.gsap.set(target.node, { top: posY });
+      gsap.set(target.node, { top: posY });
     }
 
     if (type === 'left') {
@@ -435,12 +454,9 @@ export default class FullpageSwiper {
       }
 
       positions.left = posX;
-      this.dep.gsap.set(target.node, { left: posX });
+      gsap.set(target.node, { left: posX });
     }
 
-    // console.log('_dragging', type, this.eventDirection, posY, this.eventTarget, this.draggingInfo);
-
-     
     if (this.isDifferentEvent) {
       const draggingInfo = this._getDraggingInfo(this.eventTarget);
       if (draggingInfo) this.draggingInfo = draggingInfo;
@@ -465,8 +481,6 @@ export default class FullpageSwiper {
       result.to = toParent.lastSeenIndex ? toParent.lastSeenIndex : changeableTo;
       result.toParent = toParent;
     }
-    // console.log('from', from, to, changeableTo, result);
-
     return result;
   }
 
@@ -481,16 +495,15 @@ export default class FullpageSwiper {
 
     // resizeComplete 시 currentIdx 로 이동
 
-    const mc = new this.dep.Hammer(this.containerRef);
+    const mc = new Hammer(this.containerRef);
     // save mc instance for remove event listeners - mc.off();
     this.hammers.push(mc);
     mc.add(
-      new this.dep.Hammer.Pan({
-        direction: this.dep.Hammer.DIRECTION_ALL,
+      new Hammer.Pan({
+        direction: Hammer.DIRECTION_ALL,
         threshold: this.options.threshold
       })
     );
-    // console.log(2);
 
     // Hammer pan event issue : not support event.currentTarget
     this.stacks.forEach(({ node }) => {
@@ -502,6 +515,42 @@ export default class FullpageSwiper {
     mc.on('panright', this._panright.bind(this));
     mc.on('pandown', this._pandown.bind(this));
     mc.on('panup', this._panup.bind(this));
+
+    window.addEventListener('resize', this.resizeCallback);
+  }
+  _resizeCallback() {
+    this.setCommonLayout();
+    this.setLayout();
+      // Positions update
+    const root = this.parents[0];
+    this._updatePositions(root);
+    root.children.forEach((child) => {
+      this._updatePositions(child);
+    });
+    this.stacks.forEach((s) => {
+      this._updatePositions(s);
+      this._updatePositions(s.innerParent);
+    });
+  }
+  _updatePositions({ positions, node }) {
+    const { clientHeight, clientWidth } = this.viewport;
+    const { yResize, topResize, xResize, leftResize } = positions;
+    if (yResize) {
+      positions.y = yResize * clientHeight;
+      gsap.set(node, { y: positions.y });
+    }
+    if (topResize) {
+      positions.top = topResize * clientHeight;
+      gsap.set(node, { top: positions.top });
+    }
+    if (xResize) {
+      positions.x = xResize * clientWidth;
+      gsap.set(node, { x: positions.x });
+    }
+    if (leftResize) {
+      positions.left = leftResize * clientWidth;
+      gsap.set(node, { left: positions.left });
+    }
   }
   setCommonLayout() {
     // Block x,y scrolling
@@ -801,7 +850,8 @@ export default class FullpageSwiper {
       } else {
         // 도착지가 다른 축인 경우
         // - vertical -> horizontal
-        result.right.changeableTo = nextParent.children[nextParent.children.length - 1].stackIndex;
+        result.right.changeableTo 
+          = nextParent.children[nextParent.children.length - 1].stackIndex;
       }
     }
 
