@@ -60,13 +60,13 @@ export default class FullpageSwiper {
     this.setCommonLayout();
     this.setLayout();
 
-    this._addEvents();
-
     this.resizeCallback = this._resizeCallback.bind(this);
-
+    this._addEvents();
     this.options.debug && this.debug();
   }
-  removeListeners() {}
+  clear() {
+    window.removeEventListener('resize', this.resizeCallback);
+  }
   _blockEvent(eventAxis) {
     // 최초 이벤트 요청일 경우 블록 X
     if (this.eventAxis === '') {
@@ -519,6 +519,7 @@ export default class FullpageSwiper {
     window.addEventListener('resize', this.resizeCallback);
   }
   _resizeCallback() {
+    console.log(1);
     this.setCommonLayout();
     this.setLayout();
       // Positions update
