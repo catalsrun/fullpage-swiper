@@ -1,10 +1,17 @@
 import Head from 'next/head'
 import Link from 'next/link'
+import pkg from '../../package.json';
 
 export default function Home() {
-
   return (
-    <div className="container">
+    <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: '0 0.5rem'
+      }}>
       <Head>
         <title>fullpage-swiper - Examples</title>
         <link rel="icon" href="/favicon.ico" />
@@ -15,6 +22,9 @@ export default function Home() {
         <br />
         <Link href='/y-x'>- Y-X movement example</Link>
       </main>
+      <footer style={{ marginTop: '10px' }}>
+        Version: {pkg.version}
+      </footer>
     </div>
   )
 }
