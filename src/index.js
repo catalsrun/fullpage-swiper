@@ -737,6 +737,8 @@ export default class FullpageSwiper {
         });
         if (outerParent) {
           innerParent.outerParent = outerParent;
+        } else {
+          // console.error('Check markup');
         }
       }
 
